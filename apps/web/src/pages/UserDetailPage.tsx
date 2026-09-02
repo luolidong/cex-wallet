@@ -81,7 +81,8 @@ export function UserDetailPage() {
       withdrawForm.resetFields();
       await queryClient.invalidateQueries({ queryKey: ['user-balances', userId] });
       await queryClient.invalidateQueries({ queryKey: ['user-withdrawals', userId] });
-    }
+    },
+    onError: (error) => showRequestError(error, '提现申请失败')
   });
 
   const columns: ColumnsType<Balance> = [
@@ -373,4 +374,11 @@ function safeToBaseUnit(value: string, decimals: number): string {
   } catch {
     return '';
   }
+}
+
+function showRequestError(error: unknown, fallback: string) {
+  const err = error as { response?: { data?: { error?: { code?: string; message?: string; details?: string } } }; message?: string };
+  const apiError = err.response?.data?.error;
+  const messageText = apiError?.details || apiError?.message || err.message || fallback;
+  message.error(apiError?.code ? `${apiError.code}: ${messageText}` : messageText);
 }

@@ -44,8 +44,21 @@ public class WithdrawalService {
         if (amount.compareTo(token.minWithdrawAmount()) < 0) {
             throw new BusinessException("AMOUNT_TOO_SMALL", "amount below minimum withdrawal", HttpStatus.BAD_REQUEST);
         }
+        if (withdrawalRepository.isAddressBlacklisted(token.chainId(), toAddress)) {
+            throw new BusinessException("WITHDRAW_ADDRESS_BLOCKED", "withdrawal address is blocked", HttpStatus.BAD_REQUEST);
+        }
+        if (token.maxWithdrawAmount() != null && amount.compareTo(token.maxWithdrawAmount()) > 0) {
+            throw new BusinessException("WITHDRAW_AMOUNT_EXCEEDS_SINGLE_LIMIT", "amount exceeds single withdrawal limit", HttpStatus.BAD_REQUEST);
+        }
 
         BigDecimal totalAmount = amount.add(token.withdrawFee());
+        if (token.dailyWithdrawLimit() != null) {
+            BigDecimal todayAmount = withdrawalRepository.findTodayWithdrawalAmount(userId, tokenId);
+            if (todayAmount.add(totalAmount).compareTo(token.dailyWithdrawLimit()) > 0) {
+                throw new BusinessException("WITHDRAW_AMOUNT_EXCEEDS_DAILY_LIMIT", "amount exceeds daily withdrawal limit", HttpStatus.BAD_REQUEST);
+            }
+        }
+
         BigDecimal available = withdrawalRepository.findUserAvailableBalance(userId, tokenId);
         if (available.compareTo(totalAmount) < 0) {
             throw new BusinessException("INSUFFICIENT_BALANCE", "available balance is insufficient", HttpStatus.BAD_REQUEST);

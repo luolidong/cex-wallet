@@ -1,4 +1,4 @@
-import { AuditOutlined, DashboardOutlined, UserOutlined, WalletOutlined } from '@ant-design/icons';
+import { AuditOutlined, DashboardOutlined, SafetyCertificateOutlined, UserOutlined, WalletOutlined } from '@ant-design/icons';
 import { Button, Layout, Menu, Space, Typography } from 'antd';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { clearSession, getStoredUser } from '../auth/session';
@@ -13,7 +13,9 @@ export function AdminLayout() {
     ? 'users'
     : location.pathname.startsWith('/withdrawals/review')
       ? 'withdrawals/review'
-      : 'dashboard';
+      : location.pathname.startsWith('/risk/settings')
+        ? 'risk/settings'
+        : 'dashboard';
 
   function handleLogout() {
     clearSession();
@@ -33,6 +35,7 @@ export function AdminLayout() {
             { key: 'dashboard', icon: <DashboardOutlined />, label: '仪表盘' },
             { key: 'users', icon: <UserOutlined />, label: '用户管理' },
             { key: 'withdrawals/review', icon: <AuditOutlined />, label: '提现审核' },
+            { key: 'risk/settings', icon: <SafetyCertificateOutlined />, label: '风控配置' },
             { key: 'assets', icon: <WalletOutlined />, label: '资产管理' }
           ]}
         />

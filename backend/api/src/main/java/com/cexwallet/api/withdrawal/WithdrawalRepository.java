@@ -20,7 +20,8 @@ public class WithdrawalRepository {
     public TokenWithdrawConfig findTokenConfig(Long tokenId) {
         return jdbcTemplate.queryForObject("""
                 SELECT t.id, t.chain_id, t.symbol, t.decimals, t.min_withdraw_amount, t.withdraw_fee,
-                  t.withdraw_enabled, t.status, c.withdraw_enabled AS chain_withdraw_enabled, c.status AS chain_status
+                  t.max_withdraw_amount, t.daily_withdraw_limit, t.withdraw_enabled, t.status,
+                  c.withdraw_enabled AS chain_withdraw_enabled, c.status AS chain_status
                 FROM tokens t
                 JOIN chains c ON c.id = t.chain_id
                 WHERE t.id = ?
@@ -31,6 +32,8 @@ public class WithdrawalRepository {
                 rs.getInt("decimals"),
                 rs.getBigDecimal("min_withdraw_amount"),
                 rs.getBigDecimal("withdraw_fee"),
+                rs.getBigDecimal("max_withdraw_amount"),
+                rs.getBigDecimal("daily_withdraw_limit"),
                 rs.getBoolean("withdraw_enabled"),
                 rs.getString("status"),
                 rs.getBoolean("chain_withdraw_enabled"),
@@ -53,6 +56,31 @@ public class WithdrawalRepository {
                   AND la.token_id = ?
                 """, BigDecimal.class, userId, tokenId);
         return balance == null ? BigDecimal.ZERO : balance;
+    }
+
+    public boolean isAddressBlacklisted(Long chainId, String address) {
+        Boolean exists = jdbcTemplate.queryForObject("""
+                SELECT EXISTS (
+                  SELECT 1
+                  FROM withdrawal_address_blacklist
+                  WHERE chain_id = ?
+                    AND LOWER(address) = LOWER(?)
+                    AND status = 'ACTIVE'
+                )
+                """, Boolean.class, chainId, address);
+        return Boolean.TRUE.equals(exists);
+    }
+
+    public BigDecimal findTodayWithdrawalAmount(Long userId, Long tokenId) {
+        BigDecimal amount = jdbcTemplate.queryForObject("""
+                SELECT COALESCE(SUM(amount + fee), 0)
+                FROM withdrawals
+                WHERE user_id = ?
+                  AND token_id = ?
+                  AND status IN ('PENDING_APPROVAL', 'APPROVED', 'BROADCASTED', 'CONFIRMED')
+                  AND requested_at >= date_trunc('day', NOW())
+                """, BigDecimal.class, userId, tokenId);
+        return amount == null ? BigDecimal.ZERO : amount;
     }
 
     public WithdrawalView createWithdrawal(Long userId, Long chainId, Long tokenId, String toAddress, BigDecimal amount, BigDecimal fee) {
@@ -198,6 +226,8 @@ public class WithdrawalRepository {
             Integer decimals,
             BigDecimal minWithdrawAmount,
             BigDecimal withdrawFee,
+            BigDecimal maxWithdrawAmount,
+            BigDecimal dailyWithdrawLimit,
             Boolean withdrawEnabled,
             String tokenStatus,
             Boolean chainWithdrawEnabled,

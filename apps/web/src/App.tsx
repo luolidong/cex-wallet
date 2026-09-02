@@ -3,6 +3,7 @@ import { RequireAuth } from './auth/RequireAuth';
 import { AdminLayout } from './layouts/AdminLayout';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
+import { RiskSettingsPage } from './pages/RiskSettingsPage';
 import { UserDetailPage } from './pages/UserDetailPage';
 import { UsersPage } from './pages/UsersPage';
 import { WithdrawalReviewPage } from './pages/WithdrawalReviewPage';
@@ -18,6 +19,7 @@ export function App() {
             <Route path="users" element={<UsersPage />} />
             <Route path="users/:userId" element={<UserDetailPage />} />
             <Route path="withdrawals/review" element={<WithdrawalReviewPage />} />
+            <Route path="risk/settings" element={<RiskSettingsPage />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
