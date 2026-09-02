@@ -17,3 +17,8 @@ export async function rejectWithdrawal(id: number, reason?: string): Promise<Wit
   const response = await http.post<{ success: boolean; data: Withdrawal }>(`/withdrawals/${id}/reject`, { reason });
   return response.data.data;
 }
+
+export async function confirmWithdrawal(id: number, txHash?: string): Promise<Withdrawal> {
+  const response = await http.post<{ success: boolean; data: Withdrawal }>(`/withdrawals/${id}/confirm`, { txHash });
+  return response.data.data;
+}

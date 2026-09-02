@@ -1,18 +1,21 @@
 import { CheckOutlined, CloseOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Form, Input, Modal, Space, Table, Tag, Typography, message } from 'antd';
+import { Button, Form, Input, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useState } from 'react';
-import { approveWithdrawal, listWithdrawals, rejectWithdrawal } from '../api/withdrawals';
+import { approveWithdrawal, confirmWithdrawal, listWithdrawals, rejectWithdrawal } from '../api/withdrawals';
 import type { Withdrawal } from '../api/users';
 
 export function WithdrawalReviewPage() {
   const [rejecting, setRejecting] = useState<Withdrawal>();
+  const [confirming, setConfirming] = useState<Withdrawal>();
+  const [status, setStatus] = useState('PENDING_APPROVAL');
   const [form] = Form.useForm<{ reason: string }>();
+  const [confirmForm] = Form.useForm<{ txHash: string }>();
   const queryClient = useQueryClient();
   const withdrawalsQuery = useQuery({
-    queryKey: ['withdrawals', 'PENDING_APPROVAL'],
-    queryFn: () => listWithdrawals('PENDING_APPROVAL')
+    queryKey: ['withdrawals', status],
+    queryFn: () => listWithdrawals(status)
   });
 
   const approveMutation = useMutation({
@@ -33,6 +36,16 @@ export function WithdrawalReviewPage() {
     }
   });
 
+  const confirmMutation = useMutation({
+    mutationFn: ({ id, txHash }: { id: number; txHash?: string }) => confirmWithdrawal(id, txHash),
+    onSuccess: async () => {
+      message.success('提现已确认，冻结余额已扣除');
+      setConfirming(undefined);
+      confirmForm.resetFields();
+      await queryClient.invalidateQueries({ queryKey: ['withdrawals'] });
+    }
+  });
+
   const columns: ColumnsType<Withdrawal> = [
     { title: 'ID', dataIndex: 'id', width: 80 },
     { title: '用户 ID', dataIndex: 'userId', width: 100 },
@@ -48,7 +61,7 @@ export function WithdrawalReviewPage() {
       title: '状态',
       dataIndex: 'status',
       width: 150,
-      render: (value) => <Tag color="gold">{value}</Tag>
+      render: (value) => <Tag color={statusColor(value)}>{value}</Tag>
     },
     {
       title: '申请时间',
@@ -61,18 +74,27 @@ export function WithdrawalReviewPage() {
       width: 180,
       render: (_, record) => (
         <Space>
-          <Button
-            size="small"
-            type="primary"
-            icon={<CheckOutlined />}
-            loading={approveMutation.isPending}
-            onClick={() => approveMutation.mutate(record.id)}
-          >
-            批准
-          </Button>
-          <Button size="small" danger icon={<CloseOutlined />} onClick={() => setRejecting(record)}>
-            拒绝
-          </Button>
+          {record.status === 'PENDING_APPROVAL' ? (
+            <>
+              <Button
+                size="small"
+                type="primary"
+                icon={<CheckOutlined />}
+                loading={approveMutation.isPending}
+                onClick={() => approveMutation.mutate(record.id)}
+              >
+                批准
+              </Button>
+              <Button size="small" danger icon={<CloseOutlined />} onClick={() => setRejecting(record)}>
+                拒绝
+              </Button>
+            </>
+          ) : null}
+          {record.status === 'APPROVED' ? (
+            <Button size="small" type="primary" icon={<CheckOutlined />} onClick={() => setConfirming(record)}>
+              确认链上成功
+            </Button>
+          ) : null}
         </Space>
       )
     }
@@ -86,6 +108,14 @@ export function WithdrawalReviewPage() {
     rejectMutation.mutate({ id: rejecting.id, reason: values.reason });
   }
 
+  async function handleConfirm() {
+    if (!confirming) {
+      return;
+    }
+    const values = await confirmForm.validateFields();
+    confirmMutation.mutate({ id: confirming.id, txHash: values.txHash });
+  }
+
   return (
     <>
       <div className="page-toolbar">
@@ -93,9 +123,22 @@ export function WithdrawalReviewPage() {
           <Typography.Title level={3}>提现审核</Typography.Title>
           <Typography.Text type="secondary">处理待审核提现申请。</Typography.Text>
         </div>
-        <Button icon={<ReloadOutlined />} onClick={() => withdrawalsQuery.refetch()}>
-          刷新
-        </Button>
+        <Space>
+          <Select
+            value={status}
+            onChange={setStatus}
+            options={[
+              { value: 'PENDING_APPROVAL', label: '待审核' },
+              { value: 'APPROVED', label: '已批准' },
+              { value: 'CONFIRMED', label: '已确认' },
+              { value: 'REJECTED', label: '已拒绝' }
+            ]}
+            style={{ width: 140 }}
+          />
+          <Button icon={<ReloadOutlined />} onClick={() => withdrawalsQuery.refetch()}>
+            刷新
+          </Button>
+        </Space>
       </div>
 
       <Table
@@ -121,6 +164,37 @@ export function WithdrawalReviewPage() {
           </Form.Item>
         </Form>
       </Modal>
+
+      <Modal
+        title="确认链上成功"
+        open={Boolean(confirming)}
+        okText="确认"
+        confirmLoading={confirmMutation.isPending}
+        onOk={handleConfirm}
+        onCancel={() => setConfirming(undefined)}
+      >
+        <Form form={confirmForm} layout="vertical">
+          <Form.Item label="交易 Hash" name="txHash" rules={[{ required: true, message: '请输入交易 Hash' }]}>
+            <Input placeholder="例如 0x..." />
+          </Form.Item>
+        </Form>
+      </Modal>
     </>
   );
+}
+
+function statusColor(status: string) {
+  if (status === 'PENDING_APPROVAL') {
+    return 'gold';
+  }
+  if (status === 'APPROVED') {
+    return 'blue';
+  }
+  if (status === 'CONFIRMED') {
+    return 'green';
+  }
+  if (status === 'REJECTED') {
+    return 'red';
+  }
+  return 'default';
 }

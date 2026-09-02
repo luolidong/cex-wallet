@@ -121,6 +121,38 @@ public class WithdrawalService {
         return findWithdrawal(withdrawalId);
     }
 
+    @Transactional
+    public WithdrawalView confirm(Long withdrawalId, String txHash) {
+        WithdrawalView withdrawal = findWithdrawal(withdrawalId);
+        if (!"APPROVED".equals(withdrawal.status())) {
+            throw new BusinessException("INVALID_STATUS", "withdrawal is not approved", HttpStatus.BAD_REQUEST);
+        }
+
+        BigDecimal totalAmount = withdrawal.amount().add(withdrawal.fee());
+        Long frozenAccountId = ledgerRepository.getOrCreateAccount(OWNER_TYPE_USER, withdrawal.userId(), ACCOUNT_FROZEN, withdrawal.tokenId());
+        String idempotencyKey = "withdrawal:settle:" + withdrawal.id();
+
+        if (ledgerRepository.findJournalByIdempotencyKey(idempotencyKey).isEmpty()) {
+            String journalNo = "J" + Instant.now().toEpochMilli() + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+            Long journalId = ledgerRepository.createJournal(
+                    journalNo,
+                    "WITHDRAWAL_SETTLE",
+                    String.valueOf(withdrawal.id()),
+                    idempotencyKey,
+                    "withdrawal confirmed"
+            );
+            ledgerRepository.createEntry(journalId, frozenAccountId, "DEBIT", withdrawal.tokenId(), totalAmount);
+        }
+
+        String normalizedTxHash = txHash == null || txHash.isBlank()
+                ? "0xmanual" + UUID.randomUUID().toString().replace("-", "")
+                : txHash;
+        if (!withdrawalRepository.confirm(withdrawalId, "APPROVED", normalizedTxHash)) {
+            throw new BusinessException("INVALID_STATUS", "withdrawal status changed", HttpStatus.CONFLICT);
+        }
+        return findWithdrawal(withdrawalId);
+    }
+
     private WithdrawalView findWithdrawal(Long withdrawalId) {
         return withdrawalRepository.findOptionalById(withdrawalId)
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", "withdrawal not found", HttpStatus.NOT_FOUND));

@@ -1,6 +1,7 @@
 package com.cexwallet.api.withdrawal;
 
 import com.cexwallet.api.common.ApiResponse;
+import com.cexwallet.api.withdrawal.WithdrawalDtos.ConfirmWithdrawalRequest;
 import com.cexwallet.api.withdrawal.WithdrawalDtos.RejectWithdrawalRequest;
 import com.cexwallet.api.withdrawal.WithdrawalDtos.WithdrawalView;
 import java.util.List;
@@ -38,5 +39,14 @@ public class AdminWithdrawalController {
     ) {
         String reason = request == null ? null : request.reason();
         return ApiResponse.ok(withdrawalService.reject(id, reason));
+    }
+
+    @PostMapping("/{id}/confirm")
+    public ApiResponse<WithdrawalView> confirm(
+            @PathVariable Long id,
+            @RequestBody(required = false) ConfirmWithdrawalRequest request
+    ) {
+        String txHash = request == null ? null : request.txHash();
+        return ApiResponse.ok(withdrawalService.confirm(id, txHash));
     }
 }
