@@ -58,4 +58,9 @@ public class RiskController {
     public ApiResponse<List<BlacklistAddressView>> disableBlacklistAddress(@PathVariable Long id) {
         return ApiResponse.ok(riskService.disableBlacklistAddress(id));
     }
+
+    @PostMapping("/withdrawal-address-blacklist/{id}/enable")
+    public ApiResponse<List<BlacklistAddressView>> enableBlacklistAddress(@PathVariable Long id) {
+        return ApiResponse.ok(riskService.enableBlacklistAddress(id));
+    }
 }

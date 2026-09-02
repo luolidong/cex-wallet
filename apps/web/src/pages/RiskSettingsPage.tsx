@@ -1,4 +1,4 @@
-import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { CheckOutlined, DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Form, Input, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
@@ -6,6 +6,7 @@ import { useState } from 'react';
 import {
   addBlacklistAddress,
   disableBlacklistAddress,
+  enableBlacklistAddress,
   listBlacklistAddresses,
   listRiskChains,
   listWithdrawalRules,
@@ -84,6 +85,15 @@ export function RiskSettingsPage() {
     onError: (error) => showRequestError(error, '停用黑名单失败')
   });
 
+  const enableBlacklistMutation = useMutation({
+    mutationFn: enableBlacklistAddress,
+    onSuccess: async () => {
+      message.success('黑名单地址已启用');
+      await queryClient.invalidateQueries({ queryKey: ['risk', 'withdrawal-address-blacklist'] });
+    },
+    onError: (error) => showRequestError(error, '启用黑名单失败')
+  });
+
   const ruleColumns: ColumnsType<WithdrawalRule> = [
     { title: 'Token', dataIndex: 'symbol', width: 100 },
     { title: '类型', dataIndex: 'tokenType', width: 110 },
@@ -128,8 +138,9 @@ export function RiskSettingsPage() {
     {
       title: '操作',
       width: 110,
-      render: (_, record) =>
-        record.status === 'ACTIVE' ? (
+      render: (_, record) => (
+        <Space>
+          {record.status === 'ACTIVE' ? (
           <Button
             size="small"
             danger
@@ -139,9 +150,19 @@ export function RiskSettingsPage() {
           >
             停用
           </Button>
-        ) : (
-          <Typography.Text type="secondary">无操作</Typography.Text>
-        )
+          ) : (
+            <Button
+              size="small"
+              type="primary"
+              icon={<CheckOutlined />}
+              loading={enableBlacklistMutation.isPending}
+              onClick={() => enableBlacklistMutation.mutate(record.id)}
+            >
+              启用
+            </Button>
+          )}
+        </Space>
+      )
     }
   ];
 

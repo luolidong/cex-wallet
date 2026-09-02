@@ -75,3 +75,8 @@ export async function disableBlacklistAddress(id: number): Promise<BlacklistAddr
   const response = await http.delete<{ success: boolean; data: BlacklistAddress[] }>(`/risk/withdrawal-address-blacklist/${id}`);
   return response.data.data;
 }
+
+export async function enableBlacklistAddress(id: number): Promise<BlacklistAddress[]> {
+  const response = await http.post<{ success: boolean; data: BlacklistAddress[] }>(`/risk/withdrawal-address-blacklist/${id}/enable`);
+  return response.data.data;
+}

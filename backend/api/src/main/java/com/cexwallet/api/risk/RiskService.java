@@ -53,4 +53,12 @@ public class RiskService {
         }
         return riskRepository.findBlacklistAddresses();
     }
+
+    @Transactional
+    public List<BlacklistAddressView> enableBlacklistAddress(Long id) {
+        if (!riskRepository.enableBlacklistAddress(id)) {
+            throw new BusinessException("NOT_FOUND", "blacklist address not found", HttpStatus.NOT_FOUND);
+        }
+        return riskRepository.findBlacklistAddresses();
+    }
 }

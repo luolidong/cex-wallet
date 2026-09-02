@@ -15,7 +15,9 @@ export function AdminLayout() {
       ? 'withdrawals/review'
       : location.pathname.startsWith('/risk/settings')
         ? 'risk/settings'
-        : 'dashboard';
+        : location.pathname.startsWith('/assets')
+          ? 'assets'
+          : 'dashboard';
 
   function handleLogout() {
     clearSession();

@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { RequireAuth } from './auth/RequireAuth';
 import { AdminLayout } from './layouts/AdminLayout';
+import { AssetManagementPage } from './pages/AssetManagementPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { RiskSettingsPage } from './pages/RiskSettingsPage';
@@ -20,6 +21,7 @@ export function App() {
             <Route path="users/:userId" element={<UserDetailPage />} />
             <Route path="withdrawals/review" element={<WithdrawalReviewPage />} />
             <Route path="risk/settings" element={<RiskSettingsPage />} />
+            <Route path="assets" element={<AssetManagementPage />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

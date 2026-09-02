@@ -81,6 +81,15 @@ public class RiskRepository {
         return updated == 1;
     }
 
+    public boolean enableBlacklistAddress(Long id) {
+        int updated = jdbcTemplate.update("""
+                UPDATE withdrawal_address_blacklist
+                SET status = 'ACTIVE', updated_at = NOW()
+                WHERE id = ?
+                """, id);
+        return updated == 1;
+    }
+
     private BlacklistAddressView findBlacklistAddress(Long id) {
         return jdbcTemplate.queryForObject("""
                 SELECT b.id, b.chain_id, c.name AS chain_name, b.address, b.reason, b.status, b.created_at

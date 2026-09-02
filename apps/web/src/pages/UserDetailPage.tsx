@@ -4,6 +4,7 @@ import { Alert, Button, Descriptions, Empty, Form, Input, Modal, Select, Space, 
 import type { ColumnsType } from 'antd/es/table';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { listWithdrawalRules } from '../api/risk';
 import {
   createWithdrawal,
   createDepositAddress,
@@ -63,6 +64,10 @@ export function UserDetailPage() {
     queryKey: ['user-withdrawals', userId],
     queryFn: () => listUserWithdrawals(userId),
     enabled: Number.isFinite(userId)
+  });
+  const withdrawalRulesQuery = useQuery({
+    queryKey: ['risk', 'withdrawal-rules'],
+    queryFn: listWithdrawalRules
   });
 
   const createAddressMutation = useMutation({
@@ -171,6 +176,7 @@ export function UserDetailPage() {
   const user = userQuery.data;
   const balances = balancesQuery.data || [];
   const selectedBalance = balances.find((item) => item.tokenId === selectedTokenId);
+  const selectedWithdrawalRule = withdrawalRulesQuery.data?.find((item) => item.tokenId === selectedTokenId);
   const withdrawalAmountPreview = selectedBalance ? safeToBaseUnit(displayAmount || '', selectedBalance.decimals) : '';
 
   function openWithdrawModal() {
@@ -319,8 +325,16 @@ export function UserDetailPage() {
                   try {
                     const amount = BigInt(toBaseUnit(value, selectedBalance.decimals));
                     const available = BigInt(selectedBalance.available);
+                    const minWithdrawAmount = BigInt(selectedWithdrawalRule?.minWithdrawAmount || '0');
+                    const maxWithdrawAmount = selectedWithdrawalRule?.maxWithdrawAmount ? BigInt(selectedWithdrawalRule.maxWithdrawAmount) : undefined;
                     if (amount <= 0n) {
                       return Promise.reject(new Error('提现数量必须大于 0'));
+                    }
+                    if (amount < minWithdrawAmount) {
+                      return Promise.reject(new Error(`最小提现数量为 ${selectedWithdrawalRule?.displayMinWithdrawAmount} ${selectedBalance.symbol}`));
+                    }
+                    if (maxWithdrawAmount !== undefined && amount > maxWithdrawAmount) {
+                      return Promise.reject(new Error(`单笔上限为 ${selectedWithdrawalRule?.displayMaxWithdrawAmount} ${selectedBalance.symbol}`));
                     }
                     if (amount > available) {
                       return Promise.reject(new Error('提现数量超过可用余额'));
@@ -336,12 +350,30 @@ export function UserDetailPage() {
             <Input placeholder="例如 0.1" suffix={selectedBalance?.symbol} />
           </Form.Item>
           {selectedBalance ? (
-            <Alert
-              type="info"
-              showIcon
-              message={`可用 ${selectedBalance.displayAvailable} ${selectedBalance.symbol}，冻结 ${selectedBalance.displayFrozen} ${selectedBalance.symbol}`}
-              description={withdrawalAmountPreview ? `提交金额最小单位：${withdrawalAmountPreview}` : '输入提现数量后会自动换算为链上最小单位'}
-            />
+            <Space direction="vertical" className="full-width" size={12}>
+              <Alert
+                type="info"
+                showIcon
+                message={`可用 ${selectedBalance.displayAvailable} ${selectedBalance.symbol}，冻结 ${selectedBalance.displayFrozen} ${selectedBalance.symbol}`}
+                description={withdrawalAmountPreview ? `提交金额最小单位：${withdrawalAmountPreview}` : '输入提现数量后会自动换算为链上最小单位'}
+              />
+              {selectedWithdrawalRule ? (
+                <Descriptions bordered size="small" column={2}>
+                  <Descriptions.Item label="最小提现">
+                    {selectedWithdrawalRule.displayMinWithdrawAmount} {selectedBalance.symbol}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="手续费">
+                    {selectedWithdrawalRule.displayWithdrawFee} {selectedBalance.symbol}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="单笔上限">
+                    {selectedWithdrawalRule.displayMaxWithdrawAmount || '不限'} {selectedWithdrawalRule.displayMaxWithdrawAmount ? selectedBalance.symbol : ''}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="每日上限">
+                    {selectedWithdrawalRule.displayDailyWithdrawLimit || '不限'} {selectedWithdrawalRule.displayDailyWithdrawLimit ? selectedBalance.symbol : ''}
+                  </Descriptions.Item>
+                </Descriptions>
+              ) : null}
+            </Space>
           ) : (
             <Alert type="warning" showIcon message="当前用户暂无可提现资产" />
           )}
