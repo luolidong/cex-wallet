@@ -1,0 +1,16 @@
+{
+  "name": "cex-wallet",
+  "version": "0.1.0",
+  "description": "CEX wallet system",
+  "private": true,
+  "scripts": {
+    "web:dev": "pnpm --dir apps/web dev",
+    "web:build": "pnpm --dir apps/web build",
+    "web:preview": "pnpm --dir apps/web preview"
+  },
+  "packageManager": "pnpm@11.5.3",
+  "engines": {
+    "node": ">=23",
+    "pnpm": ">=11"
+  }
+}

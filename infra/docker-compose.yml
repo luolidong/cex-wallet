@@ -1,0 +1,84 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cex-wallet-postgres
+    environment:
+      POSTGRES_DB: cex_wallet
+      POSTGRES_USER: cex_wallet
+      POSTGRES_PASSWORD: cex_wallet
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: cex-wallet-redis
+    ports:
+      - "6379:6379"
+
+  api:
+    image: maven:3.9-eclipse-temurin-21
+    container_name: cex-wallet-api
+    working_dir: /workspace/backend/api
+    command: mvn spring-boot:run
+    profiles:
+      - app
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/cex_wallet
+      DB_USERNAME: cex_wallet
+      DB_PASSWORD: cex_wallet
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../:/workspace
+    depends_on:
+      - postgres
+      - redis
+
+  web:
+    image: node:22-alpine
+    container_name: cex-wallet-web
+    working_dir: /workspace
+    command: sh -c "corepack enable && pnpm install && pnpm web:dev -- --host 0.0.0.0"
+    profiles:
+      - app
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../:/workspace
+    depends_on:
+      - api
+
+  scanner:
+    image: golang:1.27-alpine
+    container_name: cex-wallet-scanner
+    working_dir: /workspace/services/scanner
+    command: go run ./cmd/scanner
+    profiles:
+      - app
+    environment:
+      PORT: 8092
+      API_BASE_URL: http://api:8080
+      INTERNAL_API_TOKEN: dev-internal-token
+    ports:
+      - "8092:8092"
+    volumes:
+      - ../:/workspace
+
+  signer:
+    image: golang:1.27-alpine
+    container_name: cex-wallet-signer
+    working_dir: /workspace/services/signer
+    command: go run ./cmd/signer
+    profiles:
+      - app
+    environment:
+      PORT: 8091
+    ports:
+      - "8091:8091"
+    volumes:
+      - ../:/workspace
+
+volumes:
+  postgres_data:

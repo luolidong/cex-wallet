@@ -1,0 +1,33 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: cex-wallet-api
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/cex_wallet}
+    username: ${DB_USERNAME:cex_wallet}
+    password: ${DB_PASSWORD:cex_wallet}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:dev-secret-change-me-dev-secret-change-me}
+    expires-seconds: ${JWT_EXPIRES_SECONDS:7200}
+  internal:
+    token: ${INTERNAL_API_TOKEN:dev-internal-token}
+  bootstrap:
+    admin-username: ${BOOTSTRAP_ADMIN_USERNAME:admin}
+    admin-password: ${BOOTSTRAP_ADMIN_PASSWORD:admin123456}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
