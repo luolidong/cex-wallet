@@ -5,6 +5,7 @@ import { AssetManagementPage } from './pages/AssetManagementPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { RiskSettingsPage } from './pages/RiskSettingsPage';
+import { ScannerStatusPage } from './pages/ScannerStatusPage';
 import { UserDetailPage } from './pages/UserDetailPage';
 import { UsersPage } from './pages/UsersPage';
 import { WithdrawalReviewPage } from './pages/WithdrawalReviewPage';
@@ -20,6 +21,7 @@ export function App() {
             <Route path="users" element={<UsersPage />} />
             <Route path="users/:userId" element={<UserDetailPage />} />
             <Route path="withdrawals/review" element={<WithdrawalReviewPage />} />
+            <Route path="scanner/status" element={<ScannerStatusPage />} />
             <Route path="risk/settings" element={<RiskSettingsPage />} />
             <Route path="assets" element={<AssetManagementPage />} />
           </Route>

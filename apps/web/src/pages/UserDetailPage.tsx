@@ -57,7 +57,8 @@ export function UserDetailPage() {
   const depositsQuery = useQuery({
     queryKey: ['user-deposits', userId],
     queryFn: () => listUserDeposits(userId),
-    enabled: Number.isFinite(userId)
+    enabled: Number.isFinite(userId),
+    refetchInterval: 10000
   });
 
   const withdrawalsQuery = useQuery({
@@ -204,6 +205,13 @@ export function UserDetailPage() {
     });
   }
 
+  function refreshUserAssetData() {
+    balancesQuery.refetch();
+    walletsQuery.refetch();
+    depositsQuery.refetch();
+    withdrawalsQuery.refetch();
+  }
+
   return (
     <>
       <div className="page-toolbar">
@@ -215,8 +223,8 @@ export function UserDetailPage() {
           </div>
         </Space>
         <Space>
-          <Button icon={<ReloadOutlined />} onClick={() => balancesQuery.refetch()}>
-            刷新余额
+          <Button icon={<ReloadOutlined />} onClick={refreshUserAssetData}>
+            刷新资产数据
           </Button>
           <Button loading={createAddressMutation.isPending} onClick={() => createAddressMutation.mutate()}>
             生成充值地址
