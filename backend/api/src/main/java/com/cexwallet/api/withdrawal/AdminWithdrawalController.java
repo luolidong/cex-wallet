@@ -49,4 +49,9 @@ public class AdminWithdrawalController {
         String txHash = request == null ? null : request.txHash();
         return ApiResponse.ok(withdrawalService.confirm(id, txHash));
     }
+
+    @PostMapping("/{id}/broadcast")
+    public ApiResponse<WithdrawalView> broadcast(@PathVariable Long id) {
+        return ApiResponse.ok(withdrawalService.broadcast(id));
+    }
 }

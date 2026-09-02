@@ -22,11 +22,13 @@ public class WithdrawalService {
     private final WithdrawalRepository withdrawalRepository;
     private final LedgerRepository ledgerRepository;
     private final UserService userService;
+    private final SignerClient signerClient;
 
-    public WithdrawalService(WithdrawalRepository withdrawalRepository, LedgerRepository ledgerRepository, UserService userService) {
+    public WithdrawalService(WithdrawalRepository withdrawalRepository, LedgerRepository ledgerRepository, UserService userService, SignerClient signerClient) {
         this.withdrawalRepository = withdrawalRepository;
         this.ledgerRepository = ledgerRepository;
         this.userService = userService;
+        this.signerClient = signerClient;
     }
 
     @Transactional
@@ -124,8 +126,8 @@ public class WithdrawalService {
     @Transactional
     public WithdrawalView confirm(Long withdrawalId, String txHash) {
         WithdrawalView withdrawal = findWithdrawal(withdrawalId);
-        if (!"APPROVED".equals(withdrawal.status())) {
-            throw new BusinessException("INVALID_STATUS", "withdrawal is not approved", HttpStatus.BAD_REQUEST);
+        if (!"APPROVED".equals(withdrawal.status()) && !"BROADCASTED".equals(withdrawal.status())) {
+            throw new BusinessException("INVALID_STATUS", "withdrawal is not approved or broadcasted", HttpStatus.BAD_REQUEST);
         }
 
         BigDecimal totalAmount = withdrawal.amount().add(withdrawal.fee());
@@ -147,7 +149,23 @@ public class WithdrawalService {
         String normalizedTxHash = txHash == null || txHash.isBlank()
                 ? "0xmanual" + UUID.randomUUID().toString().replace("-", "")
                 : txHash;
-        if (!withdrawalRepository.confirm(withdrawalId, "APPROVED", normalizedTxHash)) {
+        if (!withdrawalRepository.confirm(withdrawalId, withdrawal.status(), normalizedTxHash)) {
+            throw new BusinessException("INVALID_STATUS", "withdrawal status changed", HttpStatus.CONFLICT);
+        }
+        return findWithdrawal(withdrawalId);
+    }
+
+    @Transactional
+    public WithdrawalView broadcast(Long withdrawalId) {
+        WithdrawalView withdrawal = findWithdrawal(withdrawalId);
+        if (!"APPROVED".equals(withdrawal.status())) {
+            throw new BusinessException("INVALID_STATUS", "withdrawal is not approved", HttpStatus.BAD_REQUEST);
+        }
+        SignerClient.BroadcastResponse response = signerClient.broadcast(withdrawal);
+        if (response == null || response.txHash() == null || response.txHash().isBlank()) {
+            throw new BusinessException("SIGNER_ERROR", "signer did not return tx hash", HttpStatus.BAD_GATEWAY);
+        }
+        if (!withdrawalRepository.markBroadcasted(withdrawalId, "APPROVED", response.txHash())) {
             throw new BusinessException("INVALID_STATUS", "withdrawal status changed", HttpStatus.CONFLICT);
         }
         return findWithdrawal(withdrawalId);

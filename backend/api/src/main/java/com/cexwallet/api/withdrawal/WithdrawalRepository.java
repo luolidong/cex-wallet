@@ -138,6 +138,15 @@ public class WithdrawalRepository {
         return updated == 1;
     }
 
+    public boolean markBroadcasted(Long withdrawalId, String expectedStatus, String txHash) {
+        int updated = jdbcTemplate.update("""
+                UPDATE withdrawals
+                SET status = 'BROADCASTED', tx_hash = ?, broadcasted_at = NOW(), updated_at = NOW()
+                WHERE id = ? AND status = ?
+                """, txHash, withdrawalId, expectedStatus);
+        return updated == 1;
+    }
+
     public List<WithdrawalView> findUserWithdrawals(Long userId) {
         return jdbcTemplate.query("""
                 SELECT w.id, w.user_id, w.chain_id, c.name AS chain_name, w.token_id, t.symbol, t.decimals,

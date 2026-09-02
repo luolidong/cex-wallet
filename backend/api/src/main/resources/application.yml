@@ -22,6 +22,8 @@ app:
     expires-seconds: ${JWT_EXPIRES_SECONDS:7200}
   internal:
     token: ${INTERNAL_API_TOKEN:dev-internal-token}
+  signer:
+    base-url: ${SIGNER_BASE_URL:http://localhost:8091}
   bootstrap:
     admin-username: ${BOOTSTRAP_ADMIN_USERNAME:admin}
     admin-password: ${BOOTSTRAP_ADMIN_PASSWORD:admin123456}

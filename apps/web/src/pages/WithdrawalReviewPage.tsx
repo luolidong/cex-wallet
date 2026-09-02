@@ -1,9 +1,9 @@
-import { CheckOutlined, CloseOutlined, ReloadOutlined } from '@ant-design/icons';
+import { CheckOutlined, CloseOutlined, CloudUploadOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Form, Input, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useState } from 'react';
-import { approveWithdrawal, confirmWithdrawal, listWithdrawals, rejectWithdrawal } from '../api/withdrawals';
+import { approveWithdrawal, broadcastWithdrawal, confirmWithdrawal, listWithdrawals, rejectWithdrawal } from '../api/withdrawals';
 import type { Withdrawal } from '../api/users';
 
 export function WithdrawalReviewPage() {
@@ -42,6 +42,14 @@ export function WithdrawalReviewPage() {
       message.success('提现已确认，冻结余额已扣除');
       setConfirming(undefined);
       confirmForm.resetFields();
+      await queryClient.invalidateQueries({ queryKey: ['withdrawals'] });
+    }
+  });
+
+  const broadcastMutation = useMutation({
+    mutationFn: broadcastWithdrawal,
+    onSuccess: async () => {
+      message.success('提现已广播');
       await queryClient.invalidateQueries({ queryKey: ['withdrawals'] });
     }
   });
@@ -91,8 +99,19 @@ export function WithdrawalReviewPage() {
             </>
           ) : null}
           {record.status === 'APPROVED' ? (
+            <Button
+              size="small"
+              type="primary"
+              icon={<CloudUploadOutlined />}
+              loading={broadcastMutation.isPending}
+              onClick={() => broadcastMutation.mutate(record.id)}
+            >
+              广播
+            </Button>
+          ) : null}
+          {record.status === 'BROADCASTED' ? (
             <Button size="small" type="primary" icon={<CheckOutlined />} onClick={() => setConfirming(record)}>
-              确认链上成功
+              确认成功
             </Button>
           ) : null}
         </Space>
@@ -130,6 +149,7 @@ export function WithdrawalReviewPage() {
             options={[
               { value: 'PENDING_APPROVAL', label: '待审核' },
               { value: 'APPROVED', label: '已批准' },
+              { value: 'BROADCASTED', label: '已广播' },
               { value: 'CONFIRMED', label: '已确认' },
               { value: 'REJECTED', label: '已拒绝' }
             ]}
@@ -189,6 +209,9 @@ function statusColor(status: string) {
   }
   if (status === 'APPROVED') {
     return 'blue';
+  }
+  if (status === 'BROADCASTED') {
+    return 'processing';
   }
   if (status === 'CONFIRMED') {
     return 'green';

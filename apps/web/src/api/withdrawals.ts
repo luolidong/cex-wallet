@@ -22,3 +22,8 @@ export async function confirmWithdrawal(id: number, txHash?: string): Promise<Wi
   const response = await http.post<{ success: boolean; data: Withdrawal }>(`/withdrawals/${id}/confirm`, { txHash });
   return response.data.data;
 }
+
+export async function broadcastWithdrawal(id: number): Promise<Withdrawal> {
+  const response = await http.post<{ success: boolean; data: Withdrawal }>(`/withdrawals/${id}/broadcast`);
+  return response.data.data;
+}

@@ -1,11 +1,16 @@
 package main
 
 import (
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"time"
+
+	"cex-wallet/services/signer/internal/api"
 )
 
 type healthResponse struct {
@@ -29,6 +34,31 @@ func main() {
 				"status":  "UP",
 				"time":    time.Now().UTC().Format(time.RFC3339),
 			},
+		})
+	})
+
+	http.HandleFunc("/evm/withdrawals/broadcast", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		var input api.BroadcastWithdrawalRequest
+		if err := json.Unmarshal(body, &input); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		hash := sha256.Sum256([]byte(fmt.Sprintf("withdrawal:%d:%s:%s:%d", input.WithdrawalID, input.ToAddress, input.Amount, time.Now().UnixNano())))
+		writeJSON(w, api.BroadcastWithdrawalResponse{
+			TxHash:         "0x" + fmt.Sprintf("%x", hash[:]),
+			RawTransaction: "0xmock-signed-transaction",
+			Status:         "BROADCASTED",
 		})
 	})
 
