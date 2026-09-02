@@ -21,9 +21,6 @@ func NewBroadcaster(cfg config.Config) *Broadcaster {
 }
 
 func (b *Broadcaster) Broadcast(ctx context.Context, input api.BroadcastWithdrawalRequest) (api.BroadcastWithdrawalResponse, error) {
-	if !strings.EqualFold(input.Symbol, "ETH") {
-		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("real broadcast currently supports ETH only, got %s", input.Symbol)
-	}
 	if b.cfg.Mode != "real" {
 		return mockBroadcast(input), nil
 	}
@@ -31,6 +28,13 @@ func (b *Broadcaster) Broadcast(ctx context.Context, input api.BroadcastWithdraw
 		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("EVM_HOT_WALLET_PRIVATE_KEY is required when SIGNER_MODE=real")
 	}
 
+	if strings.EqualFold(input.TokenType, "ERC20") {
+		return b.broadcastERC20(ctx, input)
+	}
+	return b.broadcastNative(ctx, input)
+}
+
+func (b *Broadcaster) broadcastNative(ctx context.Context, input api.BroadcastWithdrawalRequest) (api.BroadcastWithdrawalResponse, error) {
 	output, err := exec.CommandContext(ctx,
 		"cast",
 		"send",
@@ -47,6 +51,37 @@ func (b *Broadcaster) Broadcast(ctx context.Context, input api.BroadcastWithdraw
 	txHash := extractTxHash(string(output))
 	if txHash == "" {
 		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("cast send did not return transaction hash: %s", strings.TrimSpace(string(output)))
+	}
+
+	return api.BroadcastWithdrawalResponse{
+		TxHash:         txHash,
+		RawTransaction: "",
+		Status:         "BROADCASTED",
+	}, nil
+}
+
+func (b *Broadcaster) broadcastERC20(ctx context.Context, input api.BroadcastWithdrawalRequest) (api.BroadcastWithdrawalResponse, error) {
+	if input.TokenAddress == "" {
+		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("tokenAddress is required for ERC20 withdrawal")
+	}
+	output, err := exec.CommandContext(ctx,
+		"cast",
+		"send",
+		input.TokenAddress,
+		"transfer(address,uint256)",
+		input.ToAddress,
+		input.Amount,
+		"--private-key", b.cfg.EVMPrivateKey,
+		"--rpc-url", b.cfg.EVMRPCURL,
+		"--json",
+	).CombinedOutput()
+	if err != nil {
+		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("cast erc20 transfer failed: %w: %s", err, strings.TrimSpace(string(output)))
+	}
+
+	txHash := extractTxHash(string(output))
+	if txHash == "" {
+		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("cast erc20 transfer did not return transaction hash: %s", strings.TrimSpace(string(output)))
 	}
 
 	return api.BroadcastWithdrawalResponse{

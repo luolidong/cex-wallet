@@ -65,6 +65,8 @@ export interface Withdrawal {
   chainName: string;
   tokenId: number;
   symbol: string;
+  tokenType: string;
+  tokenAddress?: string;
   decimals: number;
   toAddress: string;
   amount: string;

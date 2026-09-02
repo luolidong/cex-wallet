@@ -17,6 +17,8 @@ type BroadcastWithdrawalRequest struct {
 	ChainID      int64  `json:"chainId"`
 	TokenID      int64  `json:"tokenId"`
 	Symbol       string `json:"symbol"`
+	TokenType    string `json:"tokenType"`
+	TokenAddress string `json:"tokenAddress"`
 	ToAddress    string `json:"toAddress"`
 	Amount       string `json:"amount"`
 }

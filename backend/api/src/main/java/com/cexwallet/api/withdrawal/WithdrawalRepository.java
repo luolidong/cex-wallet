@@ -65,7 +65,7 @@ public class WithdrawalRepository {
 
     public WithdrawalView findById(Long id) {
         return jdbcTemplate.queryForObject("""
-                SELECT w.id, w.user_id, w.chain_id, c.name AS chain_name, w.token_id, t.symbol, t.decimals,
+                SELECT w.id, w.user_id, w.chain_id, c.name AS chain_name, w.token_id, t.symbol, t.token_type, t.token_address, t.decimals,
                   w.to_address, w.amount, w.fee, w.status, w.tx_hash, w.reject_reason, w.requested_at, w.created_at
                 FROM withdrawals w
                 JOIN chains c ON c.id = w.chain_id
@@ -76,7 +76,7 @@ public class WithdrawalRepository {
 
     public Optional<WithdrawalView> findOptionalById(Long id) {
         List<WithdrawalView> withdrawals = jdbcTemplate.query("""
-                SELECT w.id, w.user_id, w.chain_id, c.name AS chain_name, w.token_id, t.symbol, t.decimals,
+                SELECT w.id, w.user_id, w.chain_id, c.name AS chain_name, w.token_id, t.symbol, t.token_type, t.token_address, t.decimals,
                   w.to_address, w.amount, w.fee, w.status, w.tx_hash, w.reject_reason, w.requested_at, w.created_at
                 FROM withdrawals w
                 JOIN chains c ON c.id = w.chain_id
@@ -89,7 +89,7 @@ public class WithdrawalRepository {
     public List<WithdrawalView> findAll(String status) {
         if (status == null || status.isBlank()) {
             return jdbcTemplate.query("""
-                    SELECT w.id, w.user_id, w.chain_id, c.name AS chain_name, w.token_id, t.symbol, t.decimals,
+                    SELECT w.id, w.user_id, w.chain_id, c.name AS chain_name, w.token_id, t.symbol, t.token_type, t.token_address, t.decimals,
                       w.to_address, w.amount, w.fee, w.status, w.tx_hash, w.reject_reason, w.requested_at, w.created_at
                     FROM withdrawals w
                     JOIN chains c ON c.id = w.chain_id
@@ -99,7 +99,7 @@ public class WithdrawalRepository {
                     """, this::mapWithdrawal);
         }
         return jdbcTemplate.query("""
-                SELECT w.id, w.user_id, w.chain_id, c.name AS chain_name, w.token_id, t.symbol, t.decimals,
+                SELECT w.id, w.user_id, w.chain_id, c.name AS chain_name, w.token_id, t.symbol, t.token_type, t.token_address, t.decimals,
                   w.to_address, w.amount, w.fee, w.status, w.tx_hash, w.reject_reason, w.requested_at, w.created_at
                 FROM withdrawals w
                 JOIN chains c ON c.id = w.chain_id
@@ -149,7 +149,7 @@ public class WithdrawalRepository {
 
     public List<WithdrawalView> findUserWithdrawals(Long userId) {
         return jdbcTemplate.query("""
-                SELECT w.id, w.user_id, w.chain_id, c.name AS chain_name, w.token_id, t.symbol, t.decimals,
+                SELECT w.id, w.user_id, w.chain_id, c.name AS chain_name, w.token_id, t.symbol, t.token_type, t.token_address, t.decimals,
                   w.to_address, w.amount, w.fee, w.status, w.tx_hash, w.reject_reason, w.requested_at, w.created_at
                 FROM withdrawals w
                 JOIN chains c ON c.id = w.chain_id
@@ -171,6 +171,8 @@ public class WithdrawalRepository {
                 rs.getString("chain_name"),
                 rs.getLong("token_id"),
                 rs.getString("symbol"),
+                rs.getString("token_type"),
+                rs.getString("token_address"),
                 decimals,
                 rs.getString("to_address"),
                 amount,

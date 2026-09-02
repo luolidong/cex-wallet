@@ -25,6 +25,8 @@ public class SignerClient {
                         withdrawal.chainId(),
                         withdrawal.tokenId(),
                         withdrawal.symbol(),
+                        withdrawal.tokenType(),
+                        withdrawal.tokenAddress(),
                         withdrawal.toAddress(),
                         withdrawal.amount().toPlainString()
                 ))
@@ -37,6 +39,8 @@ public class SignerClient {
             Long chainId,
             Long tokenId,
             String symbol,
+            String tokenType,
+            String tokenAddress,
             String toAddress,
             String amount
     ) {

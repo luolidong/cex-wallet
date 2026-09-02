@@ -21,6 +21,8 @@ public class WithdrawalDtos {
             String chainName,
             Long tokenId,
             String symbol,
+            String tokenType,
+            String tokenAddress,
             Integer decimals,
             String toAddress,
             BigDecimal amount,
