@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { RequireAuth } from './auth/RequireAuth';
 import { AdminLayout } from './layouts/AdminLayout';
 import { AssetManagementPage } from './pages/AssetManagementPage';
+import { AuditLogsPage } from './pages/AuditLogsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { RiskSettingsPage } from './pages/RiskSettingsPage';
@@ -26,6 +27,7 @@ export function App() {
             <Route path="risk/settings" element={<RiskSettingsPage />} />
             <Route path="assets" element={<AssetManagementPage />} />
             <Route path="system/status" element={<SystemStatusPage />} />
+            <Route path="audit-logs" element={<AuditLogsPage />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
