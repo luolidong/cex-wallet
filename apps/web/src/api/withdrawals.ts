@@ -3,7 +3,7 @@ import type { Withdrawal } from './users';
 
 export async function listWithdrawals(status?: string): Promise<Withdrawal[]> {
   const response = await http.get<{ success: boolean; data: Withdrawal[] }>('/withdrawals', {
-    params: status ? { status } : undefined
+    params: status && status !== 'ALL' ? { status } : undefined
   });
   return response.data.data;
 }

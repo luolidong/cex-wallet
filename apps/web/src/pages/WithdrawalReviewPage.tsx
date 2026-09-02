@@ -9,7 +9,7 @@ import type { Withdrawal } from '../api/users';
 export function WithdrawalReviewPage() {
   const [rejecting, setRejecting] = useState<Withdrawal>();
   const [confirming, setConfirming] = useState<Withdrawal>();
-  const [status, setStatus] = useState('PENDING_APPROVAL');
+  const [status, setStatus] = useState('ALL');
   const [form] = Form.useForm<{ reason: string }>();
   const [confirmForm] = Form.useForm<{ txHash: string }>();
   const queryClient = useQueryClient();
@@ -23,7 +23,9 @@ export function WithdrawalReviewPage() {
     onSuccess: async () => {
       message.success('提现已批准');
       await queryClient.invalidateQueries({ queryKey: ['withdrawals'] });
-    }
+      setStatus('APPROVED');
+    },
+    onError: (error) => showRequestError(error, '批准失败')
   });
 
   const rejectMutation = useMutation({
@@ -33,7 +35,8 @@ export function WithdrawalReviewPage() {
       setRejecting(undefined);
       form.resetFields();
       await queryClient.invalidateQueries({ queryKey: ['withdrawals'] });
-    }
+    },
+    onError: (error) => showRequestError(error, '拒绝失败')
   });
 
   const confirmMutation = useMutation({
@@ -43,15 +46,19 @@ export function WithdrawalReviewPage() {
       setConfirming(undefined);
       confirmForm.resetFields();
       await queryClient.invalidateQueries({ queryKey: ['withdrawals'] });
-    }
+    },
+    onError: (error) => showRequestError(error, '确认失败')
   });
 
   const broadcastMutation = useMutation({
     mutationFn: broadcastWithdrawal,
     onSuccess: async () => {
       message.success('提现已广播');
+      setStatus('BROADCASTED');
       await queryClient.invalidateQueries({ queryKey: ['withdrawals'] });
-    }
+      await queryClient.refetchQueries({ queryKey: ['withdrawals', 'BROADCASTED'] });
+    },
+    onError: (error) => showRequestError(error, '广播失败，请确认 signer 服务已启动')
   });
 
   const columns: ColumnsType<Withdrawal> = [
@@ -114,6 +121,9 @@ export function WithdrawalReviewPage() {
               确认成功
             </Button>
           ) : null}
+          {!['PENDING_APPROVAL', 'APPROVED', 'BROADCASTED'].includes(record.status) ? (
+            <Typography.Text type="secondary">无操作</Typography.Text>
+          ) : null}
         </Space>
       )
     }
@@ -147,6 +157,7 @@ export function WithdrawalReviewPage() {
             value={status}
             onChange={setStatus}
             options={[
+              { value: 'ALL', label: '全部' },
               { value: 'PENDING_APPROVAL', label: '待审核' },
               { value: 'APPROVED', label: '已批准' },
               { value: 'BROADCASTED', label: '已广播' },
@@ -220,4 +231,20 @@ function statusColor(status: string) {
     return 'red';
   }
   return 'default';
+}
+
+function showRequestError(error: unknown, fallback: string) {
+  if (typeof error === 'object' && error && 'response' in error) {
+    const response = (error as { response?: { data?: { error?: { message?: string }; message?: string } } }).response;
+    const apiMessage = response?.data?.error?.message || response?.data?.message;
+    if (apiMessage) {
+      message.error(`${fallback}：${apiMessage}`);
+      return;
+    }
+  }
+  if (error instanceof Error && error.message) {
+    message.error(`${fallback}：${error.message}`);
+    return;
+  }
+  message.error(fallback);
 }

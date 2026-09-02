@@ -26,7 +26,7 @@ public class SignerClient {
                         withdrawal.tokenId(),
                         withdrawal.symbol(),
                         withdrawal.toAddress(),
-                        withdrawal.amount()
+                        withdrawal.amount().toPlainString()
                 ))
                 .retrieve()
                 .body(BroadcastResponse.class);
@@ -38,7 +38,7 @@ public class SignerClient {
             Long tokenId,
             String symbol,
             String toAddress,
-            BigDecimal amount
+            String amount
     ) {
     }
 
