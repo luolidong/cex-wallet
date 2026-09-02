@@ -1,4 +1,4 @@
-import { AuditOutlined, DashboardOutlined, FileSearchOutlined, MonitorOutlined, RadarChartOutlined, SafetyCertificateOutlined, UserOutlined, WalletOutlined } from '@ant-design/icons';
+import { AuditOutlined, DashboardOutlined, FileSearchOutlined, MonitorOutlined, RadarChartOutlined, ReconciliationOutlined, SafetyCertificateOutlined, UserOutlined, WalletOutlined } from '@ant-design/icons';
 import { Button, Layout, Menu, Space, Typography } from 'antd';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { clearSession, getStoredUser } from '../auth/session';
@@ -23,7 +23,9 @@ export function AdminLayout() {
                 ? 'system/status'
                 : location.pathname.startsWith('/audit-logs')
                   ? 'audit-logs'
-                  : 'dashboard';
+                  : location.pathname.startsWith('/reconciliation')
+                    ? 'reconciliation'
+                    : 'dashboard';
 
   function handleLogout() {
     clearSession();
@@ -47,7 +49,8 @@ export function AdminLayout() {
             { key: 'risk/settings', icon: <SafetyCertificateOutlined />, label: '风控配置' },
             { key: 'assets', icon: <WalletOutlined />, label: '资产管理' },
             { key: 'system/status', icon: <MonitorOutlined />, label: '系统状态' },
-            { key: 'audit-logs', icon: <FileSearchOutlined />, label: '审计日志' }
+            { key: 'audit-logs', icon: <FileSearchOutlined />, label: '审计日志' },
+            { key: 'reconciliation', icon: <ReconciliationOutlined />, label: '账务对账' }
           ]}
         />
       </Sider>

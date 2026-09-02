@@ -5,6 +5,7 @@ import { AssetManagementPage } from './pages/AssetManagementPage';
 import { AuditLogsPage } from './pages/AuditLogsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
+import { ReconciliationPage } from './pages/ReconciliationPage';
 import { RiskSettingsPage } from './pages/RiskSettingsPage';
 import { ScannerStatusPage } from './pages/ScannerStatusPage';
 import { SystemStatusPage } from './pages/SystemStatusPage';
@@ -28,6 +29,7 @@ export function App() {
             <Route path="assets" element={<AssetManagementPage />} />
             <Route path="system/status" element={<SystemStatusPage />} />
             <Route path="audit-logs" element={<AuditLogsPage />} />
+            <Route path="reconciliation" element={<ReconciliationPage />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
