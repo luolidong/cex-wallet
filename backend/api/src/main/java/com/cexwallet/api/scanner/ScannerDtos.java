@@ -87,4 +87,19 @@ public class ScannerDtos {
             Instant createdAt
     ) {
     }
+
+    public record BroadcastedWithdrawalView(
+            Long id,
+            Long userId,
+            Long chainId,
+            Long tokenId,
+            String symbol,
+            String txHash,
+            Integer confirmBlocks,
+            String status
+    ) {
+    }
+
+    public record ConfirmWithdrawalRequest(@NotNull Long withdrawalId, @NotBlank String txHash) {
+    }
 }

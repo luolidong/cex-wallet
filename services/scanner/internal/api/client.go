@@ -88,6 +88,28 @@ type UpdateCursorRequest struct {
 	LastFinalizedBlock int64  `json:"lastFinalizedBlock"`
 }
 
+type BroadcastedWithdrawal struct {
+	ID            int64  `json:"id"`
+	UserID        int64  `json:"userId"`
+	ChainID       int64  `json:"chainId"`
+	TokenID       int64  `json:"tokenId"`
+	Symbol        string `json:"symbol"`
+	TxHash        string `json:"txHash"`
+	ConfirmBlocks int    `json:"confirmBlocks"`
+	Status        string `json:"status"`
+}
+
+type ConfirmWithdrawalRequest struct {
+	WithdrawalID int64  `json:"withdrawalId"`
+	TxHash       string `json:"txHash"`
+}
+
+type WithdrawalResponse struct {
+	ID     int64  `json:"id"`
+	Status string `json:"status"`
+	TxHash string `json:"txHash"`
+}
+
 type envelope[T any] struct {
 	Success bool   `json:"success"`
 	Data    T      `json:"data"`
@@ -136,6 +158,30 @@ func (c *Client) UpdateCursor(ctx context.Context, input UpdateCursorRequest) (S
 	}
 	if !output.Success {
 		return ScannerCursor{}, fmt.Errorf("api returned unsuccessful response: %s", output.Message)
+	}
+	return output.Data, nil
+}
+
+func (c *Client) ListBroadcastedWithdrawals(ctx context.Context) ([]BroadcastedWithdrawal, error) {
+	var output envelope[[]BroadcastedWithdrawal]
+	err := c.get(ctx, "/api/internal/scanner/withdrawals/broadcasted", &output)
+	if err != nil {
+		return nil, err
+	}
+	if !output.Success {
+		return nil, fmt.Errorf("api returned unsuccessful response: %s", output.Message)
+	}
+	return output.Data, nil
+}
+
+func (c *Client) ConfirmWithdrawal(ctx context.Context, input ConfirmWithdrawalRequest) (WithdrawalResponse, error) {
+	var output envelope[WithdrawalResponse]
+	err := c.post(ctx, "/api/internal/scanner/withdrawals/confirmed", input, &output)
+	if err != nil {
+		return WithdrawalResponse{}, err
+	}
+	if !output.Success {
+		return WithdrawalResponse{}, fmt.Errorf("api returned unsuccessful response: %s", output.Message)
 	}
 	return output.Data, nil
 }

@@ -1,6 +1,7 @@
 package com.cexwallet.api.scanner;
 
 import com.cexwallet.api.scanner.ScannerDtos.SubmitDepositResponse;
+import com.cexwallet.api.scanner.ScannerDtos.BroadcastedWithdrawalView;
 import com.cexwallet.api.scanner.ScannerDtos.ChainConfigView;
 import com.cexwallet.api.scanner.ScannerDtos.DepositAddressView;
 import com.cexwallet.api.scanner.ScannerDtos.ScannerCursorView;
@@ -85,6 +86,28 @@ public class ScannerRepository {
                 FROM scanner_cursors
                 ORDER BY chain_id, scanner_name
                 """, this::mapCursor);
+    }
+
+    public List<BroadcastedWithdrawalView> findBroadcastedWithdrawals() {
+        return jdbcTemplate.query("""
+                SELECT w.id, w.user_id, w.chain_id, w.token_id, t.symbol, w.tx_hash, c.confirm_blocks, w.status
+                FROM withdrawals w
+                JOIN tokens t ON t.id = w.token_id
+                JOIN chains c ON c.id = w.chain_id
+                WHERE w.status = 'BROADCASTED'
+                  AND w.tx_hash IS NOT NULL
+                ORDER BY w.id
+                LIMIT 50
+                """, (rs, rowNum) -> new BroadcastedWithdrawalView(
+                rs.getLong("id"),
+                rs.getLong("user_id"),
+                rs.getLong("chain_id"),
+                rs.getLong("token_id"),
+                rs.getString("symbol"),
+                rs.getString("tx_hash"),
+                rs.getInt("confirm_blocks"),
+                rs.getString("status")
+        ));
     }
 
     public ScannerCursorView upsertScannerCursor(Long chainId, String scannerName, Long lastScannedBlock, Long lastFinalizedBlock) {

@@ -6,7 +6,11 @@ import com.cexwallet.api.scanner.ScannerDtos.SubmitDepositRequest;
 import com.cexwallet.api.scanner.ScannerDtos.SubmitDepositResponse;
 import com.cexwallet.api.scanner.ScannerDtos.ScannerConfigResponse;
 import com.cexwallet.api.scanner.ScannerDtos.ScannerCursorView;
+import com.cexwallet.api.scanner.ScannerDtos.BroadcastedWithdrawalView;
+import com.cexwallet.api.scanner.ScannerDtos.ConfirmWithdrawalRequest;
 import com.cexwallet.api.scanner.ScannerDtos.UpdateCursorRequest;
+import com.cexwallet.api.withdrawal.WithdrawalDtos.WithdrawalView;
+import com.cexwallet.api.withdrawal.WithdrawalService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,15 +26,18 @@ import org.springframework.web.bind.annotation.RestController;
 public class InternalScannerController {
     private final ScannerDepositService scannerDepositService;
     private final ScannerRepository scannerRepository;
+    private final WithdrawalService withdrawalService;
     private final String internalToken;
 
     public InternalScannerController(
             ScannerDepositService scannerDepositService,
             ScannerRepository scannerRepository,
+            WithdrawalService withdrawalService,
             @Value("${app.internal.token}") String internalToken
     ) {
         this.scannerDepositService = scannerDepositService;
         this.scannerRepository = scannerRepository;
+        this.withdrawalService = withdrawalService;
         this.internalToken = internalToken;
     }
 
@@ -68,6 +75,23 @@ public class InternalScannerController {
     ) {
         assertInternalToken(token);
         return ApiResponse.ok(scannerDepositService.submitDeposit(request));
+    }
+
+    @GetMapping("/withdrawals/broadcasted")
+    public ApiResponse<java.util.List<BroadcastedWithdrawalView>> broadcastedWithdrawals(
+            @RequestHeader(value = "X-Internal-Token", required = false) String token
+    ) {
+        assertInternalToken(token);
+        return ApiResponse.ok(scannerRepository.findBroadcastedWithdrawals());
+    }
+
+    @PostMapping("/withdrawals/confirmed")
+    public ApiResponse<WithdrawalView> confirmWithdrawal(
+            @RequestHeader(value = "X-Internal-Token", required = false) String token,
+            @Valid @RequestBody ConfirmWithdrawalRequest request
+    ) {
+        assertInternalToken(token);
+        return ApiResponse.ok(withdrawalService.confirm(request.withdrawalId(), request.txHash()));
     }
 
     private void assertInternalToken(String token) {

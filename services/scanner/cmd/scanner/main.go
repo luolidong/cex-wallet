@@ -12,6 +12,7 @@ import (
 	"cex-wallet/services/scanner/internal/config"
 	"cex-wallet/services/scanner/internal/evm"
 	"cex-wallet/services/scanner/internal/scan"
+	"cex-wallet/services/scanner/internal/withdrawal"
 )
 
 type healthResponse struct {
@@ -21,11 +22,12 @@ type healthResponse struct {
 }
 
 type scanState struct {
-	mu          sync.RWMutex
-	running     bool
-	lastRunAt   string
-	lastError   string
-	lastResults []evm.Result
+	mu              sync.RWMutex
+	running         bool
+	lastRunAt       string
+	lastError       string
+	lastResults     []evm.Result
+	lastWithdrawals withdrawal.Result
 }
 
 func (s *scanState) snapshot() map[string]interface{} {
@@ -36,6 +38,7 @@ func (s *scanState) snapshot() map[string]interface{} {
 		"lastRunAt":   s.lastRunAt,
 		"lastError":   s.lastError,
 		"lastResults": s.lastResults,
+		"withdrawals": s.lastWithdrawals,
 	}
 }
 
@@ -57,13 +60,27 @@ func (s *scanState) setResult(results []evm.Result, err error) {
 	s.lastError = ""
 }
 
+func (s *scanState) setWithdrawalResult(result withdrawal.Result, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.lastRunAt = time.Now().UTC().Format(time.RFC3339)
+	s.lastWithdrawals = result
+	if err != nil {
+		s.lastError = err.Error()
+		return
+	}
+	s.lastError = ""
+}
+
 func main() {
 	cfg := config.Load()
 	apiClient := api.NewClient(cfg.APIBaseURL, cfg.InternalToken)
 	mockScanner := scan.NewMockScanner(apiClient)
 	evmScanner := evm.NewScanner(apiClient)
+	withdrawalConfirmer := withdrawal.NewConfirmer(apiClient)
 	state := &scanState{}
 	startEVMScanLoop(evmScanner, cfg.PollInterval, state)
+	startWithdrawalConfirmLoop(withdrawalConfirmer, cfg.PollInterval, state)
 
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, healthResponse{
@@ -169,6 +186,26 @@ func main() {
 		})
 	})
 
+	http.HandleFunc("/scan/withdrawals", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		result, err := withdrawalConfirmer.ConfirmOnce(r.Context())
+		state.setWithdrawalResult(result, err)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		writeJSON(w, healthResponse{
+			Success: true,
+			Message: "ok",
+			Data: map[string]interface{}{
+				"result": result,
+			},
+		})
+	})
+
 	log.Printf("scanner service listening on :%s, api=%s", cfg.Port, cfg.APIBaseURL)
 	log.Fatal(http.ListenAndServe(":"+cfg.Port, nil))
 }
@@ -188,6 +225,36 @@ func startEVMScanLoop(scanner *evm.Scanner, interval time.Duration, state *scanS
 			<-ticker.C
 		}
 	}()
+}
+
+func startWithdrawalConfirmLoop(confirmer *withdrawal.Confirmer, interval time.Duration, state *scanState) {
+	if interval <= 0 {
+		log.Printf("withdrawal confirmer auto loop disabled")
+		return
+	}
+
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for {
+			runWithdrawalConfirm(confirmer, state)
+			<-ticker.C
+		}
+	}()
+}
+
+func runWithdrawalConfirm(confirmer *withdrawal.Confirmer, state *scanState) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	result, err := confirmer.ConfirmOnce(ctx)
+	if err != nil {
+		log.Printf("withdrawal confirmer auto run failed: %v", err)
+	} else if result.Found > 0 {
+		log.Printf("withdrawal confirmer auto run completed: %+v", result)
+	}
+	state.setWithdrawalResult(result, err)
 }
 
 func runEVMScan(scanner *evm.Scanner, state *scanState) {
