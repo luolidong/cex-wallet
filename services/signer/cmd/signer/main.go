@@ -1,16 +1,15 @@
 package main
 
 import (
-	"crypto/sha256"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"cex-wallet/services/signer/internal/api"
+	"cex-wallet/services/signer/internal/config"
+	"cex-wallet/services/signer/internal/evm"
 )
 
 type healthResponse struct {
@@ -20,10 +19,8 @@ type healthResponse struct {
 }
 
 func main() {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8091"
-	}
+	cfg := config.Load()
+	broadcaster := evm.NewBroadcaster(cfg)
 
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, healthResponse{
@@ -33,6 +30,7 @@ func main() {
 				"service": "cex-wallet-signer",
 				"status":  "UP",
 				"time":    time.Now().UTC().Format(time.RFC3339),
+				"mode":    cfg.Mode,
 			},
 		})
 	})
@@ -54,16 +52,16 @@ func main() {
 			return
 		}
 
-		hash := sha256.Sum256([]byte(fmt.Sprintf("withdrawal:%d:%s:%s:%d", input.WithdrawalID, input.ToAddress, input.Amount, time.Now().UnixNano())))
-		writeJSON(w, api.BroadcastWithdrawalResponse{
-			TxHash:         "0x" + fmt.Sprintf("%x", hash[:]),
-			RawTransaction: "0xmock-signed-transaction",
-			Status:         "BROADCASTED",
-		})
+		result, err := broadcaster.Broadcast(r.Context(), input)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		writeJSON(w, result)
 	})
 
-	log.Printf("signer service listening on :%s", port)
-	log.Fatal(http.ListenAndServe(":"+port, nil))
+	log.Printf("signer service listening on :%s, mode=%s", cfg.Port, cfg.Mode)
+	log.Fatal(http.ListenAndServe(":"+cfg.Port, nil))
 }
 
 func writeJSON(w http.ResponseWriter, value interface{}) {

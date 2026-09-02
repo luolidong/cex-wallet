@@ -68,6 +68,7 @@ go run ./cmd/scanner
 ```text
 docs/local-anvil-scan-test.md
 docs/local-anvil-erc20-scan-test.md
+docs/local-anvil-withdrawal-test.md
 ```
 
 Go Signer：
