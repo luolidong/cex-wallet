@@ -6,6 +6,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { RiskSettingsPage } from './pages/RiskSettingsPage';
 import { ScannerStatusPage } from './pages/ScannerStatusPage';
+import { SystemStatusPage } from './pages/SystemStatusPage';
 import { UserDetailPage } from './pages/UserDetailPage';
 import { UsersPage } from './pages/UsersPage';
 import { WithdrawalReviewPage } from './pages/WithdrawalReviewPage';
@@ -24,6 +25,7 @@ export function App() {
             <Route path="scanner/status" element={<ScannerStatusPage />} />
             <Route path="risk/settings" element={<RiskSettingsPage />} />
             <Route path="assets" element={<AssetManagementPage />} />
+            <Route path="system/status" element={<SystemStatusPage />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

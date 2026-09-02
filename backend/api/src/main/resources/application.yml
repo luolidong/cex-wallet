@@ -24,6 +24,8 @@ app:
     token: ${INTERNAL_API_TOKEN:dev-internal-token}
   signer:
     base-url: ${SIGNER_BASE_URL:http://localhost:8091}
+  scanner:
+    base-url: ${SCANNER_BASE_URL:http://localhost:8092}
   bootstrap:
     admin-username: ${BOOTSTRAP_ADMIN_USERNAME:admin}
     admin-password: ${BOOTSTRAP_ADMIN_PASSWORD:admin123456}
