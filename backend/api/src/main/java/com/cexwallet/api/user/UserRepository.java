@@ -50,6 +50,15 @@ public class UserRepository {
         return updated == 1;
     }
 
+    public boolean updateKycLevel(Long id, int kycLevel) {
+        int updated = jdbcTemplate.update("""
+                UPDATE users
+                SET kyc_level = ?, updated_at = NOW()
+                WHERE id = ?
+                """, kycLevel, id);
+        return updated == 1;
+    }
+
     private User mapRow(ResultSet rs, int rowNum) throws SQLException {
         return new User(
                 rs.getLong("id"),

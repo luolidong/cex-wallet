@@ -108,6 +108,7 @@ function actionLabel(action: string) {
     PLATFORM_WALLET_UPDATE: '修改平台钱包',
     PLATFORM_WALLET_DISABLE: '停用平台钱包',
     USER_STATUS_UPDATE: '修改用户状态',
+    USER_KYC_UPDATE: '修改用户 KYC',
     ADMIN_ACCOUNT_CREATE: '新增后台账号',
     ADMIN_ACCOUNT_STATUS_UPDATE: '修改后台账号状态',
     ADMIN_ACCOUNT_ROLES_UPDATE: '修改后台账号角色',

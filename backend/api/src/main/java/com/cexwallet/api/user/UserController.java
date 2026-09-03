@@ -4,6 +4,7 @@ import com.cexwallet.api.audit.AuditLogService;
 import com.cexwallet.api.auth.AdminUser;
 import com.cexwallet.api.common.ApiResponse;
 import com.cexwallet.api.user.UserDtos.CreateUserRequest;
+import com.cexwallet.api.user.UserDtos.UpdateUserKycLevelRequest;
 import com.cexwallet.api.user.UserDtos.UpdateUserStatusRequest;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -54,6 +55,17 @@ public class UserController {
     ) {
         User user = userService.updateStatus(id, request.status());
         auditLogService.record(adminUser, "USER_STATUS_UPDATE", "USER", id, "修改用户状态：" + user.status(), request);
+        return ApiResponse.ok(user);
+    }
+
+    @PutMapping("/{id}/kyc-level")
+    public ApiResponse<User> updateKycLevel(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateUserKycLevelRequest request,
+            @AuthenticationPrincipal AdminUser adminUser
+    ) {
+        User user = userService.updateKycLevel(id, request.kycLevel());
+        auditLogService.record(adminUser, "USER_KYC_UPDATE", "USER", id, "修改用户 KYC：L" + user.kycLevel(), request);
         return ApiResponse.ok(user);
     }
 }

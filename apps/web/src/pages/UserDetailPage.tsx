@@ -1,4 +1,4 @@
-import { ArrowLeftOutlined, ExportOutlined, ReloadOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, ExportOutlined, IdcardOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Alert, Button, Descriptions, Empty, Form, Input, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
@@ -13,6 +13,7 @@ import {
   listUserDeposits,
   listUserWallets,
   listUserWithdrawals,
+  updateUserKycLevel,
   type Balance,
   type CreateWithdrawalInput,
   type Deposit,
@@ -28,7 +29,9 @@ interface WithdrawalFormValues {
 
 export function UserDetailPage() {
   const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [kycOpen, setKycOpen] = useState(false);
   const [withdrawForm] = Form.useForm<WithdrawalFormValues>();
+  const [kycForm] = Form.useForm<{ kycLevel: number }>();
   const selectedTokenId = Form.useWatch('tokenId', withdrawForm);
   const displayAmount = Form.useWatch('displayAmount', withdrawForm);
   const navigate = useNavigate();
@@ -90,6 +93,17 @@ export function UserDetailPage() {
       await queryClient.invalidateQueries({ queryKey: ['user-withdrawals', userId] });
     },
     onError: (error) => showRequestError(error, '提现申请失败')
+  });
+
+  const kycMutation = useMutation({
+    mutationFn: (kycLevel: number) => updateUserKycLevel(userId, kycLevel),
+    onSuccess: async () => {
+      message.success('KYC 等级已更新');
+      setKycOpen(false);
+      await queryClient.invalidateQueries({ queryKey: ['user', userId] });
+      await queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: (error) => showRequestError(error, 'KYC 更新失败')
   });
 
   const columns: ColumnsType<Balance> = [
@@ -215,6 +229,16 @@ export function UserDetailPage() {
     withdrawalsQuery.refetch();
   }
 
+  function openKycModal() {
+    kycForm.setFieldsValue({ kycLevel: user?.kycLevel || 0 });
+    setKycOpen(true);
+  }
+
+  async function handleUpdateKycLevel() {
+    const values = await kycForm.validateFields();
+    kycMutation.mutate(values.kycLevel);
+  }
+
   return (
     <>
       <div className="page-toolbar">
@@ -228,6 +252,9 @@ export function UserDetailPage() {
         <Space>
           <Button icon={<ReloadOutlined />} onClick={refreshUserAssetData}>
             刷新资产数据
+          </Button>
+          <Button icon={<IdcardOutlined />} onClick={openKycModal}>
+            调整 KYC
           </Button>
           <Button
             disabled={isUserFrozen}
@@ -409,6 +436,28 @@ export function UserDetailPage() {
           ) : (
             <Alert type="warning" showIcon message="当前用户暂无可提现资产" />
           )}
+        </Form>
+      </Modal>
+
+      <Modal
+        title="调整 KYC 等级"
+        open={kycOpen}
+        okText="保存"
+        confirmLoading={kycMutation.isPending}
+        onOk={handleUpdateKycLevel}
+        onCancel={() => setKycOpen(false)}
+      >
+        <Form form={kycForm} layout="vertical">
+          <Form.Item label="KYC 等级" name="kycLevel" rules={[{ required: true, message: '请选择 KYC 等级' }]}>
+            <Select
+              options={[
+                { value: 0, label: 'L0 未认证' },
+                { value: 1, label: 'L1 基础认证' },
+                { value: 2, label: 'L2 高级认证' },
+                { value: 3, label: 'L3 机构/增强认证' }
+              ]}
+            />
+          </Form.Item>
         </Form>
       </Modal>
     </>

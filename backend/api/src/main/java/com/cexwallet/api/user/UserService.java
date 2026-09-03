@@ -59,4 +59,23 @@ public class UserService {
         }
         return status;
     }
+
+    public User updateKycLevel(Long id, Integer kycLevel) {
+        int normalizedKycLevel = normalizeKycLevel(kycLevel);
+        findById(id);
+        if (!userRepository.updateKycLevel(id, normalizedKycLevel)) {
+            throw new BusinessException("NOT_FOUND", "user not found", HttpStatus.NOT_FOUND);
+        }
+        return findById(id);
+    }
+
+    private int normalizeKycLevel(Integer kycLevel) {
+        if (kycLevel == null) {
+            throw new BusinessException("INVALID_KYC_LEVEL", "kyc level is required", HttpStatus.BAD_REQUEST);
+        }
+        if (kycLevel < 0 || kycLevel > 3) {
+            throw new BusinessException("INVALID_KYC_LEVEL", "kyc level must be between 0 and 3", HttpStatus.BAD_REQUEST);
+        }
+        return kycLevel;
+    }
 }

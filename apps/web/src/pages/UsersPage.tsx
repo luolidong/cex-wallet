@@ -1,14 +1,16 @@
-import { LockOutlined, PlusOutlined, ReloadOutlined, UnlockOutlined } from '@ant-design/icons';
+import { IdcardOutlined, LockOutlined, PlusOutlined, ReloadOutlined, UnlockOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Form, Input, Modal, Space, Table, Tag, Typography, message } from 'antd';
+import { Button, Form, Input, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createUser, listUsers, updateUserStatus, type CreateUserInput, type User } from '../api/users';
+import { createUser, listUsers, updateUserKycLevel, updateUserStatus, type CreateUserInput, type User } from '../api/users';
 
 export function UsersPage() {
   const [createOpen, setCreateOpen] = useState(false);
+  const [kycUser, setKycUser] = useState<User>();
   const [form] = Form.useForm<CreateUserInput>();
+  const [kycForm] = Form.useForm<{ kycLevel: number }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -36,6 +38,17 @@ export function UsersPage() {
       await queryClient.invalidateQueries({ queryKey: ['users'] });
     },
     onError: (error) => showRequestError(error, '状态更新失败')
+  });
+
+  const kycMutation = useMutation({
+    mutationFn: ({ id, kycLevel }: { id: number; kycLevel: number }) => updateUserKycLevel(id, kycLevel),
+    onSuccess: async () => {
+      message.success('KYC 等级已更新');
+      setKycUser(undefined);
+      kycForm.resetFields();
+      await queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: (error) => showRequestError(error, 'KYC 更新失败')
   });
 
   const columns: ColumnsType<User> = [
@@ -84,6 +97,9 @@ export function UsersPage() {
           <Button type="link" onClick={() => navigate(`/users/${record.id}`)}>
             详情
           </Button>
+          <Button size="small" icon={<IdcardOutlined />} onClick={() => openKycModal(record)}>
+            KYC
+          </Button>
           {record.status === 'ACTIVE' ? (
             <Button
               size="small"
@@ -125,6 +141,19 @@ export function UsersPage() {
       okButtonProps: { danger: freeze },
       onOk: () => statusMutation.mutateAsync({ id: user.id, status })
     });
+  }
+
+  function openKycModal(user: User) {
+    setKycUser(user);
+    kycForm.setFieldsValue({ kycLevel: user.kycLevel });
+  }
+
+  async function handleUpdateKycLevel() {
+    if (!kycUser) {
+      return;
+    }
+    const values = await kycForm.validateFields();
+    kycMutation.mutate({ id: kycUser.id, kycLevel: values.kycLevel });
   }
 
   return (
@@ -169,6 +198,29 @@ export function UsersPage() {
           </Form.Item>
           <Form.Item label="手机" name="phone">
             <Input />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="调整 KYC 等级"
+        open={Boolean(kycUser)}
+        okText="保存"
+        confirmLoading={kycMutation.isPending}
+        onOk={handleUpdateKycLevel}
+        onCancel={() => setKycUser(undefined)}
+      >
+        <Form form={kycForm} layout="vertical">
+          <Form.Item label="用户">{kycUser?.username}</Form.Item>
+          <Form.Item label="KYC 等级" name="kycLevel" rules={[{ required: true, message: '请选择 KYC 等级' }]}>
+            <Select
+              options={[
+                { value: 0, label: 'L0 未认证' },
+                { value: 1, label: 'L1 基础认证' },
+                { value: 2, label: 'L2 高级认证' },
+                { value: 3, label: 'L3 机构/增强认证' }
+              ]}
+            />
           </Form.Item>
         </Form>
       </Modal>
