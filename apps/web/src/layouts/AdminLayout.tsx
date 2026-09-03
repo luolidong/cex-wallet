@@ -26,6 +26,8 @@ export function AdminLayout() {
   }, [profileQuery.data]);
   const selectedKey = location.pathname.startsWith('/users')
       ? 'users'
+      : location.pathname.startsWith('/wallets')
+        ? 'wallets'
       : location.pathname.startsWith('/withdrawals/review')
         ? 'withdrawals/review'
         : location.pathname.startsWith('/scanner/status')
@@ -56,6 +58,7 @@ export function AdminLayout() {
   const menuItems = [
     { key: 'dashboard', icon: <DashboardOutlined />, label: '仪表盘' },
     can('user:read') ? { key: 'users', icon: <UserOutlined />, label: '用户管理' } : null,
+    can('wallet:read') ? { key: 'wallets', icon: <WalletOutlined />, label: '地址管理' } : null,
     can('withdrawal:review') ? { key: 'withdrawals/review', icon: <AuditOutlined />, label: '提现审核' } : null,
     can('scanner:read') ? { key: 'scanner/status', icon: <RadarChartOutlined />, label: '扫描状态' } : null,
     can('risk:manage') ? { key: 'risk/settings', icon: <SafetyCertificateOutlined />, label: '风控配置' } : null,

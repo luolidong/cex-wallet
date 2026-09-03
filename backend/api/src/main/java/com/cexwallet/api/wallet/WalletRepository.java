@@ -1,10 +1,12 @@
 package com.cexwallet.api.wallet;
 
 import com.cexwallet.api.wallet.WalletDtos.DepositView;
+import com.cexwallet.api.wallet.WalletDtos.AdminWalletView;
 import com.cexwallet.api.wallet.WalletDtos.WalletView;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -13,6 +15,9 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class WalletRepository {
     private final JdbcTemplate jdbcTemplate;
+
+    private record WalletQuery(StringBuilder sql, List<Object> args) {
+    }
 
     public WalletRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
@@ -53,6 +58,61 @@ public class WalletRepository {
                 """, this::mapWallet, userId);
     }
 
+    public List<AdminWalletView> findWallets(String keyword, Long chainId, String status, int limit, int offset) {
+        WalletQuery query = buildWalletQuery("""
+                SELECT w.id, w.user_id, u.username, w.chain_id, c.name AS chain_name,
+                  w.address, w.address_type, w.status, w.created_at
+                FROM wallets w
+                JOIN users u ON u.id = w.user_id
+                JOIN chains c ON c.id = w.chain_id
+                """, keyword, chainId, status);
+        query.sql().append(" ORDER BY w.id DESC LIMIT ? OFFSET ?");
+        query.args().add(limit);
+        query.args().add(offset);
+        return jdbcTemplate.query(query.sql().toString(), this::mapAdminWallet, query.args().toArray());
+    }
+
+    public long countWallets(String keyword, Long chainId, String status) {
+        WalletQuery query = buildWalletQuery("""
+                SELECT COUNT(*)
+                FROM wallets w
+                JOIN users u ON u.id = w.user_id
+                """, keyword, chainId, status);
+        Long count = jdbcTemplate.queryForObject(query.sql().toString(), Long.class, query.args().toArray());
+        return count == null ? 0 : count;
+    }
+
+    private WalletQuery buildWalletQuery(String selectSql, String keyword, Long chainId, String status) {
+        StringBuilder sql = new StringBuilder(selectSql).append(" WHERE 1 = 1");
+        List<Object> args = new ArrayList<>();
+        if (keyword != null && !keyword.isBlank()) {
+            String trimmedKeyword = keyword.trim();
+            String likeKeyword = "%" + trimmedKeyword.toLowerCase() + "%";
+            sql.append(" AND (lower(w.address) LIKE ? OR lower(u.username) LIKE ? OR CAST(w.user_id AS TEXT) = ?)");
+            args.add(likeKeyword);
+            args.add(likeKeyword);
+            args.add(trimmedKeyword);
+        }
+        if (chainId != null) {
+            sql.append(" AND w.chain_id = ?");
+            args.add(chainId);
+        }
+        if (status != null && !status.isBlank()) {
+            sql.append(" AND w.status = ?");
+            args.add(status);
+        }
+        return new WalletQuery(sql, args);
+    }
+
+    public boolean updateWalletStatus(Long id, String status) {
+        int updated = jdbcTemplate.update("""
+                UPDATE wallets
+                SET status = ?, updated_at = NOW()
+                WHERE id = ?
+                """, status, id);
+        return updated == 1;
+    }
+
     public List<DepositView> findUserDeposits(Long userId) {
         return jdbcTemplate.query("""
                 SELECT d.id, d.user_id, d.wallet_id, d.chain_id, c.name AS chain_name, d.token_id, t.symbol, t.decimals,
@@ -71,6 +131,20 @@ public class WalletRepository {
         return new WalletView(
                 rs.getLong("id"),
                 rs.getLong("user_id"),
+                rs.getLong("chain_id"),
+                rs.getString("chain_name"),
+                rs.getString("address"),
+                rs.getString("address_type"),
+                rs.getString("status"),
+                rs.getTimestamp("created_at").toInstant()
+        );
+    }
+
+    private AdminWalletView mapAdminWallet(ResultSet rs, int rowNum) throws SQLException {
+        return new AdminWalletView(
+                rs.getLong("id"),
+                rs.getLong("user_id"),
+                rs.getString("username"),
                 rs.getLong("chain_id"),
                 rs.getString("chain_name"),
                 rs.getString("address"),

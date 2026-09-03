@@ -76,7 +76,8 @@ export function UserDetailPage() {
     onSuccess: async () => {
       message.success('充值地址已生成');
       await queryClient.invalidateQueries({ queryKey: ['user-wallets', userId] });
-    }
+    },
+    onError: (error) => showRequestError(error, '生成充值地址失败')
   });
 
   const createWithdrawalMutation = useMutation({
@@ -179,6 +180,7 @@ export function UserDetailPage() {
   const selectedBalance = balances.find((item) => item.tokenId === selectedTokenId);
   const selectedWithdrawalRule = withdrawalRulesQuery.data?.find((item) => item.tokenId === selectedTokenId);
   const withdrawalAmountPreview = selectedBalance ? safeToBaseUnit(displayAmount || '', selectedBalance.decimals) : '';
+  const disabledWalletCount = (walletsQuery.data || []).filter((wallet) => wallet.status !== 'ACTIVE').length;
 
   function openWithdrawModal() {
     const firstBalance = balances.find((item) => BigInt(item.available) > 0n) || balances[0];
@@ -261,6 +263,14 @@ export function UserDetailPage() {
 
         <div>
           <Typography.Title level={4}>充值地址</Typography.Title>
+          {disabledWalletCount > 0 ? (
+            <Alert
+              className="section-alert"
+              type="warning"
+              showIcon
+              message={`有 ${disabledWalletCount} 个充值地址已停用，停用地址不会被 scanner 作为有效充值地址入账。`}
+            />
+          ) : null}
           <Table
             rowKey="id"
             columns={walletColumns}
@@ -419,6 +429,10 @@ function safeToBaseUnit(value: string, decimals: number): string {
 function showRequestError(error: unknown, fallback: string) {
   const err = error as { response?: { data?: { error?: { code?: string; message?: string; details?: string } } }; message?: string };
   const apiError = err.response?.data?.error;
+  if (apiError?.code === 'DEPOSIT_ADDRESS_DISABLED') {
+    message.error('该用户当前充值地址已停用，请先到地址管理启用后再使用。');
+    return;
+  }
   const messageText = apiError?.details || apiError?.message || err.message || fallback;
   message.error(apiError?.code ? `${apiError.code}: ${messageText}` : messageText);
 }

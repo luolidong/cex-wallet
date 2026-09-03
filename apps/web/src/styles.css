@@ -77,6 +77,14 @@ body,
   width: 100%;
 }
 
+.filter-select {
+  min-width: 160px;
+}
+
+.section-alert {
+  margin-bottom: 12px;
+}
+
 .page-error {
   padding: 24px;
 }

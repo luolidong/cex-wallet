@@ -1,8 +1,10 @@
 package com.cexwallet.api.wallet;
 
 import com.cexwallet.api.common.BusinessException;
+import com.cexwallet.api.common.PageResponse;
 import com.cexwallet.api.user.UserService;
 import com.cexwallet.api.wallet.WalletDtos.DepositView;
+import com.cexwallet.api.wallet.WalletDtos.AdminWalletView;
 import com.cexwallet.api.wallet.WalletDtos.WalletView;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -28,6 +30,12 @@ public class WalletService {
             throw new BusinessException("NOT_FOUND", "chain not found", HttpStatus.NOT_FOUND);
         }
         return walletRepository.findDepositWallet(userId, chainId)
+                .map(wallet -> {
+                    if (!"ACTIVE".equals(wallet.status())) {
+                        throw new BusinessException("DEPOSIT_ADDRESS_DISABLED", "deposit address is disabled", HttpStatus.BAD_REQUEST);
+                    }
+                    return wallet;
+                })
                 .orElseGet(() -> walletRepository.createDepositWallet(
                         userId,
                         chainId,
@@ -42,9 +50,45 @@ public class WalletService {
         return walletRepository.findUserWallets(userId);
     }
 
+    public PageResponse<AdminWalletView> findWallets(String keyword, Long chainId, String status, int page, int pageSize) {
+        String normalizedStatus = normalizeStatus(status);
+        int normalizedPage = Math.max(page, 1);
+        int normalizedPageSize = Math.min(Math.max(pageSize, 1), 100);
+        int offset = (normalizedPage - 1) * normalizedPageSize;
+        List<AdminWalletView> items = walletRepository.findWallets(keyword, chainId, normalizedStatus, normalizedPageSize, offset);
+        long total = walletRepository.countWallets(keyword, chainId, normalizedStatus);
+        return new PageResponse<>(items, normalizedPage, normalizedPageSize, total);
+    }
+
+    public List<AdminWalletView> enableWallet(Long id) {
+        updateWalletStatus(id, "ACTIVE");
+        return walletRepository.findWallets(null, null, null, 20, 0);
+    }
+
+    public List<AdminWalletView> disableWallet(Long id) {
+        updateWalletStatus(id, "INACTIVE");
+        return walletRepository.findWallets(null, null, null, 20, 0);
+    }
+
     public List<DepositView> getUserDeposits(Long userId) {
         userService.findById(userId);
         return walletRepository.findUserDeposits(userId);
+    }
+
+    private void updateWalletStatus(Long id, String status) {
+        if (!walletRepository.updateWalletStatus(id, status)) {
+            throw new BusinessException("NOT_FOUND", "wallet not found", HttpStatus.NOT_FOUND);
+        }
+    }
+
+    private String normalizeStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
+        if (!"ACTIVE".equals(status) && !"INACTIVE".equals(status)) {
+            throw new BusinessException("INVALID_STATUS", "status must be ACTIVE or INACTIVE", HttpStatus.BAD_REQUEST);
+        }
+        return status;
     }
 
     private String generateAddress(Long userId, Long chainId) {

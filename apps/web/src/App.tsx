@@ -12,6 +12,7 @@ import { ScannerStatusPage } from './pages/ScannerStatusPage';
 import { SystemStatusPage } from './pages/SystemStatusPage';
 import { UserDetailPage } from './pages/UserDetailPage';
 import { UsersPage } from './pages/UsersPage';
+import { WalletManagementPage } from './pages/WalletManagementPage';
 import { WithdrawalReviewPage } from './pages/WithdrawalReviewPage';
 
 export function App() {
@@ -24,6 +25,7 @@ export function App() {
             <Route index element={<DashboardPage />} />
             <Route path="users" element={<UsersPage />} />
             <Route path="users/:userId" element={<UserDetailPage />} />
+            <Route path="wallets" element={<WalletManagementPage />} />
             <Route path="withdrawals/review" element={<WithdrawalReviewPage />} />
             <Route path="scanner/status" element={<ScannerStatusPage />} />
             <Route path="risk/settings" element={<RiskSettingsPage />} />

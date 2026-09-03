@@ -100,7 +100,9 @@ system:read           系统状态
 asset:manage          资产管理
 risk:manage           风控配置
 withdrawal:review     提现审核和后台代提现
-user:read             用户、余额、钱包、充值记录查询
+user:read             用户、余额、充值记录查询
+wallet:read           地址管理查询
+wallet:manage         启用、停用充值地址
 ```
 
 如果账号缺少对应权限：

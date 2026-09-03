@@ -289,6 +289,57 @@ pageSize
 
 ## 8. 钱包地址接口
 
+### GET /api/wallets
+
+后台全局查询充值地址。
+
+查询参数：
+
+```text
+keyword
+chainId
+status
+page
+pageSize
+```
+
+需要权限：
+
+```text
+wallet:read
+```
+
+响应：
+
+```json
+{
+  "items": [],
+  "page": 1,
+  "pageSize": 20,
+  "total": 100
+}
+```
+
+### POST /api/wallets/{id}/enable
+
+启用充值地址。
+
+需要权限：
+
+```text
+wallet:manage
+```
+
+### POST /api/wallets/{id}/disable
+
+停用充值地址。
+
+需要权限：
+
+```text
+wallet:manage
+```
+
 ### GET /api/users/{userId}/wallets
 
 查询用户充值地址。

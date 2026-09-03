@@ -30,6 +30,7 @@ cex-wallet_demo       原 demo 参考实现
 - [实施路线](docs/implementation-plan.md)
 - [数据库设计](docs/database-design.md)
 - [API 设计](docs/api-design.md)
+- [地址管理](docs/wallet-management.md)
 
 ## 本地开发要求
 

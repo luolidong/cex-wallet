@@ -17,6 +17,19 @@ public class WalletDtos {
     ) {
     }
 
+    public record AdminWalletView(
+            Long id,
+            Long userId,
+            String username,
+            Long chainId,
+            String chainName,
+            String address,
+            String addressType,
+            String status,
+            Instant createdAt
+    ) {
+    }
+
     public record CreateDepositAddressRequest(@NotNull Long chainId) {
     }
 
