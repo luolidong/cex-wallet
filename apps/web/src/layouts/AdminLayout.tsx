@@ -1,4 +1,4 @@
-import { AuditOutlined, DashboardOutlined, FileSearchOutlined, IdcardOutlined, ImportOutlined, MonitorOutlined, RadarChartOutlined, ReconciliationOutlined, SafetyCertificateOutlined, UserOutlined, WalletOutlined } from '@ant-design/icons';
+import { AuditOutlined, DashboardOutlined, FileSearchOutlined, IdcardOutlined, ImportOutlined, MonitorOutlined, ProfileOutlined, RadarChartOutlined, ReconciliationOutlined, SafetyCertificateOutlined, UserOutlined, WalletOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Layout, Menu, Space, Typography } from 'antd';
 import { useEffect } from 'react';
@@ -24,31 +24,7 @@ export function AdminLayout() {
       updateStoredUser(profileQuery.data);
     }
   }, [profileQuery.data]);
-  const selectedKey = location.pathname.startsWith('/users')
-    ? 'users'
-    : location.pathname.startsWith('/wallets')
-      ? 'wallets'
-      : location.pathname.startsWith('/deposits')
-        ? 'deposits'
-        : location.pathname.startsWith('/withdrawal-records')
-          ? 'withdrawal-records'
-      : location.pathname.startsWith('/withdrawals/review')
-        ? 'withdrawals/review'
-        : location.pathname.startsWith('/scanner/status')
-          ? 'scanner/status'
-          : location.pathname.startsWith('/risk/settings')
-            ? 'risk/settings'
-            : location.pathname.startsWith('/assets')
-              ? 'assets'
-              : location.pathname.startsWith('/admin-management')
-                ? 'admin-management'
-                : location.pathname.startsWith('/system/status')
-                  ? 'system/status'
-                  : location.pathname.startsWith('/audit-logs')
-                    ? 'audit-logs'
-                    : location.pathname.startsWith('/reconciliation')
-                      ? 'reconciliation'
-                      : 'dashboard';
+  const selectedKey = resolveSelectedKey(location.pathname);
 
   function handleLogout() {
     clearSession();
@@ -66,6 +42,7 @@ export function AdminLayout() {
     can('wallet:read') ? { key: 'deposits', icon: <ImportOutlined />, label: '充值记录' } : null,
     can('withdrawal:review') ? { key: 'withdrawal-records', icon: <FileSearchOutlined />, label: '提现记录' } : null,
     can('withdrawal:review') ? { key: 'withdrawals/review', icon: <AuditOutlined />, label: '提现审核' } : null,
+    can('ledger:read') ? { key: 'ledger/journals', icon: <ProfileOutlined />, label: '账务流水' } : null,
     can('scanner:read') ? { key: 'scanner/status', icon: <RadarChartOutlined />, label: '扫描状态' } : null,
     can('risk:manage') ? { key: 'risk/settings', icon: <SafetyCertificateOutlined />, label: '风控配置' } : null,
     can('asset:manage') ? { key: 'assets', icon: <WalletOutlined />, label: '资产管理' } : null,
@@ -103,4 +80,21 @@ export function AdminLayout() {
       </Layout>
     </Layout>
   );
+}
+
+function resolveSelectedKey(pathname: string) {
+  if (pathname.startsWith('/users')) return 'users';
+  if (pathname.startsWith('/wallets')) return 'wallets';
+  if (pathname.startsWith('/deposits')) return 'deposits';
+  if (pathname.startsWith('/withdrawal-records')) return 'withdrawal-records';
+  if (pathname.startsWith('/withdrawals/review')) return 'withdrawals/review';
+  if (pathname.startsWith('/ledger/journals')) return 'ledger/journals';
+  if (pathname.startsWith('/scanner/status')) return 'scanner/status';
+  if (pathname.startsWith('/risk/settings')) return 'risk/settings';
+  if (pathname.startsWith('/assets')) return 'assets';
+  if (pathname.startsWith('/admin-management')) return 'admin-management';
+  if (pathname.startsWith('/system/status')) return 'system/status';
+  if (pathname.startsWith('/audit-logs')) return 'audit-logs';
+  if (pathname.startsWith('/reconciliation')) return 'reconciliation';
+  return 'dashboard';
 }

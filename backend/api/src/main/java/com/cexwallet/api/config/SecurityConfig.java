@@ -40,6 +40,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/system/**").hasAuthority("system:read")
                         .requestMatchers("/api/assets/**").hasAuthority("asset:manage")
                         .requestMatchers("/api/risk/**").hasAuthority("risk:manage")
+                        .requestMatchers(HttpMethod.GET, "/api/ledger/**").hasAuthority("ledger:read")
                         .requestMatchers(HttpMethod.GET, "/api/withdrawal-records/**").hasAuthority("withdrawal:review")
                         .requestMatchers("/api/withdrawals/**").hasAuthority("withdrawal:review")
                         .requestMatchers(HttpMethod.GET, "/api/deposits/**").hasAuthority("wallet:read")

@@ -33,6 +33,7 @@ cex-wallet_demo       原 demo 参考实现
 - [地址管理](docs/wallet-management.md)
 - [充值记录](docs/deposit-management.md)
 - [提现记录](docs/withdrawal-records.md)
+- [账务流水](docs/ledger-journals.md)
 
 ## 本地开发要求
 

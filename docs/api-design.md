@@ -384,6 +384,38 @@ pageSize
 withdrawal:review
 ```
 
+## 8.2 账务流水查询接口
+
+### GET /api/ledger/journals
+
+后台分页查询 Ledger 流水。
+
+查询参数：
+
+```text
+keyword
+businessType
+status
+page
+pageSize
+```
+
+需要权限：
+
+```text
+ledger:read
+```
+
+### GET /api/ledger/journals/{journalId}/entries
+
+查询某条流水下的账务分录。
+
+需要权限：
+
+```text
+ledger:read
+```
+
 ### GET /api/users/{userId}/wallets
 
 查询用户充值地址。

@@ -103,6 +103,7 @@ withdrawal:review     提现审核和后台代提现
 user:read             用户、余额、充值记录查询
 wallet:read           地址管理查询
 wallet:manage         启用、停用充值地址
+ledger:read           查看账务流水
 ```
 
 如果账号缺少对应权限：

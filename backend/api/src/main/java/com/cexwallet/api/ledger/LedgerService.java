@@ -1,6 +1,7 @@
 package com.cexwallet.api.ledger;
 
 import com.cexwallet.api.common.BusinessException;
+import com.cexwallet.api.common.PageResponse;
 import com.cexwallet.api.user.UserService;
 import com.cexwallet.api.wallet.WalletDtos.WalletView;
 import com.cexwallet.api.wallet.WalletService;
@@ -35,6 +36,19 @@ public class LedgerService {
     public List<BalanceView> getUserBalances(Long userId) {
         userService.findById(userId);
         return ledgerRepository.findUserBalances(userId);
+    }
+
+    public PageResponse<LedgerDtos.LedgerJournalView> findJournals(String keyword, String businessType, String status, int page, int pageSize) {
+        int normalizedPage = Math.max(page, 1);
+        int normalizedPageSize = Math.min(Math.max(pageSize, 1), 100);
+        int offset = (normalizedPage - 1) * normalizedPageSize;
+        List<LedgerDtos.LedgerJournalView> items = ledgerRepository.findJournals(keyword, businessType, status, normalizedPageSize, offset);
+        long total = ledgerRepository.countJournals(keyword, businessType, status);
+        return new PageResponse<>(items, normalizedPage, normalizedPageSize, total);
+    }
+
+    public List<LedgerDtos.LedgerEntryView> findEntries(Long journalId) {
+        return ledgerRepository.findEntries(journalId);
     }
 
     @Transactional

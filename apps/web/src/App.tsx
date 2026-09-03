@@ -6,6 +6,7 @@ import { AssetManagementPage } from './pages/AssetManagementPage';
 import { AuditLogsPage } from './pages/AuditLogsPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DepositManagementPage } from './pages/DepositManagementPage';
+import { LedgerJournalsPage } from './pages/LedgerJournalsPage';
 import { LoginPage } from './pages/LoginPage';
 import { ReconciliationPage } from './pages/ReconciliationPage';
 import { RiskSettingsPage } from './pages/RiskSettingsPage';
@@ -31,6 +32,7 @@ export function App() {
             <Route path="deposits" element={<DepositManagementPage />} />
             <Route path="withdrawal-records" element={<WithdrawalRecordsPage />} />
             <Route path="withdrawals/review" element={<WithdrawalReviewPage />} />
+            <Route path="ledger/journals" element={<LedgerJournalsPage />} />
             <Route path="scanner/status" element={<ScannerStatusPage />} />
             <Route path="risk/settings" element={<RiskSettingsPage />} />
             <Route path="assets" element={<AssetManagementPage />} />

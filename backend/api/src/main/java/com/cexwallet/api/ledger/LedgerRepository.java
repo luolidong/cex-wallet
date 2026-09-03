@@ -3,6 +3,7 @@ package com.cexwallet.api.ledger;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -11,6 +12,9 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class LedgerRepository {
     private final JdbcTemplate jdbcTemplate;
+
+    private record JournalQuery(StringBuilder sql, List<Object> args) {
+    }
 
     public LedgerRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
@@ -113,6 +117,66 @@ public class LedgerRepository {
                 """, this::mapBalance, userId);
     }
 
+    public List<LedgerDtos.LedgerJournalView> findJournals(String keyword, String businessType, String status, int limit, int offset) {
+        JournalQuery query = buildJournalQuery("""
+                SELECT id, journal_no, business_type, business_id, idempotency_key, status, description, created_at
+                FROM ledger_journals
+                """, keyword, businessType, status);
+        query.sql().append(" ORDER BY id DESC LIMIT ? OFFSET ?");
+        query.args().add(limit);
+        query.args().add(offset);
+        return jdbcTemplate.query(query.sql().toString(), this::mapJournal, query.args().toArray());
+    }
+
+    public long countJournals(String keyword, String businessType, String status) {
+        JournalQuery query = buildJournalQuery("""
+                SELECT COUNT(*)
+                FROM ledger_journals
+                """, keyword, businessType, status);
+        Long count = jdbcTemplate.queryForObject(query.sql().toString(), Long.class, query.args().toArray());
+        return count == null ? 0 : count;
+    }
+
+    public List<LedgerDtos.LedgerEntryView> findEntries(Long journalId) {
+        return jdbcTemplate.query("""
+                SELECT le.id, le.journal_id, le.account_id, la.owner_type, la.owner_id, la.account_type,
+                  le.token_id, t.symbol, t.decimals, le.direction, le.amount, le.created_at
+                FROM ledger_entries le
+                JOIN ledger_accounts la ON la.id = le.account_id
+                JOIN tokens t ON t.id = le.token_id
+                WHERE le.journal_id = ?
+                ORDER BY le.id
+                """, this::mapEntry, journalId);
+    }
+
+    private JournalQuery buildJournalQuery(String selectSql, String keyword, String businessType, String status) {
+        StringBuilder sql = new StringBuilder(selectSql).append(" WHERE 1 = 1");
+        List<Object> args = new ArrayList<>();
+        if (keyword != null && !keyword.isBlank()) {
+            String trimmedKeyword = keyword.trim();
+            String likeKeyword = "%" + trimmedKeyword.toLowerCase() + "%";
+            sql.append("""
+                     AND (lower(journal_no) LIKE ?
+                       OR lower(business_id) LIKE ?
+                       OR lower(idempotency_key) LIKE ?
+                       OR lower(COALESCE(description, '')) LIKE ?)
+                    """);
+            args.add(likeKeyword);
+            args.add(likeKeyword);
+            args.add(likeKeyword);
+            args.add(likeKeyword);
+        }
+        if (businessType != null && !businessType.isBlank()) {
+            sql.append(" AND business_type = ?");
+            args.add(businessType);
+        }
+        if (status != null && !status.isBlank()) {
+            sql.append(" AND status = ?");
+            args.add(status);
+        }
+        return new JournalQuery(sql, args);
+    }
+
     private BalanceView mapBalance(ResultSet rs, int rowNum) throws SQLException {
         BigDecimal available = rs.getBigDecimal("available");
         BigDecimal frozen = rs.getBigDecimal("frozen");
@@ -125,6 +189,39 @@ public class LedgerRepository {
                 frozen,
                 display(available, decimals),
                 display(frozen, decimals)
+        );
+    }
+
+    private LedgerDtos.LedgerJournalView mapJournal(ResultSet rs, int rowNum) throws SQLException {
+        return new LedgerDtos.LedgerJournalView(
+                rs.getLong("id"),
+                rs.getString("journal_no"),
+                rs.getString("business_type"),
+                rs.getString("business_id"),
+                rs.getString("idempotency_key"),
+                rs.getString("status"),
+                rs.getString("description"),
+                rs.getTimestamp("created_at").toInstant()
+        );
+    }
+
+    private LedgerDtos.LedgerEntryView mapEntry(ResultSet rs, int rowNum) throws SQLException {
+        BigDecimal amount = rs.getBigDecimal("amount");
+        int decimals = rs.getInt("decimals");
+        return new LedgerDtos.LedgerEntryView(
+                rs.getLong("id"),
+                rs.getLong("journal_id"),
+                rs.getLong("account_id"),
+                rs.getString("owner_type"),
+                rs.getObject("owner_id", Long.class),
+                rs.getString("account_type"),
+                rs.getLong("token_id"),
+                rs.getString("symbol"),
+                decimals,
+                rs.getString("direction"),
+                amount,
+                display(amount, decimals),
+                rs.getTimestamp("created_at").toInstant()
         );
     }
 

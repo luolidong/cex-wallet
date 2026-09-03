@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import java.math.BigDecimal;
+import java.time.Instant;
 
 public class LedgerDtos {
     public record MockDepositRequest(
@@ -13,5 +14,33 @@ public class LedgerDtos {
             String description
     ) {
     }
-}
 
+    public record LedgerJournalView(
+            Long id,
+            String journalNo,
+            String businessType,
+            String businessId,
+            String idempotencyKey,
+            String status,
+            String description,
+            Instant createdAt
+    ) {
+    }
+
+    public record LedgerEntryView(
+            Long id,
+            Long journalId,
+            Long accountId,
+            String ownerType,
+            Long ownerId,
+            String accountType,
+            Long tokenId,
+            String symbol,
+            Integer decimals,
+            String direction,
+            BigDecimal amount,
+            String displayAmount,
+            Instant createdAt
+    ) {
+    }
+}

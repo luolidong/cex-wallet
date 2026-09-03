@@ -81,6 +81,10 @@ body,
   min-width: 160px;
 }
 
+.filter-select-wide {
+  min-width: 220px;
+}
+
 .section-alert {
   margin-bottom: 12px;
 }
