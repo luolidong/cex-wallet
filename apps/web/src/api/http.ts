@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { message } from 'antd';
 import { clearSession, getAccessToken } from '../auth/session';
 
 export const http = axios.create({
@@ -22,6 +23,8 @@ http.interceptors.response.use(
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
+    } else if (error.response?.status === 403) {
+      message.error('当前账号没有权限执行此操作。');
     }
     return Promise.reject(error);
   }

@@ -32,10 +32,21 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/health", "/actuator/health", "/api/auth/login", "/api/internal/**").permitAll()
+                        .requestMatchers("/api/admin-management/**").hasAuthority("admin:manage")
+                        .requestMatchers("/api/audit-logs/**").hasAuthority("audit:read")
+                        .requestMatchers("/api/reconciliation/**").hasAuthority("reconciliation:read")
+                        .requestMatchers("/api/scanner/**").hasAuthority("scanner:read")
+                        .requestMatchers("/api/system/**").hasAuthority("system:read")
+                        .requestMatchers("/api/assets/**").hasAuthority("asset:manage")
+                        .requestMatchers("/api/risk/**").hasAuthority("risk:manage")
+                        .requestMatchers("/api/withdrawals/**").hasAuthority("withdrawal:review")
+                        .requestMatchers("/api/users/*/withdrawals/**").hasAuthority("withdrawal:review")
+                        .requestMatchers("/api/users/**").hasAuthority("user:read")
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) -> writeUnauthorized(response))
+                        .accessDeniedHandler((request, response, accessDeniedException) -> writeForbidden(response))
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
@@ -50,5 +61,11 @@ public class SecurityConfig {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         objectMapper.writeValue(response.getWriter(), ApiResponse.fail("UNAUTHORIZED", "unauthorized", null));
+    }
+
+    private void writeForbidden(HttpServletResponse response) throws IOException {
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        objectMapper.writeValue(response.getWriter(), ApiResponse.fail("FORBIDDEN", "forbidden", null));
     }
 }
