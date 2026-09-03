@@ -7,6 +7,8 @@ public class ReconciliationDtos {
             Long tokenId,
             String symbol,
             String tokenType,
+            String tokenAddress,
+            String rpcUrl,
             Integer decimals,
             BigDecimal userAvailable,
             String displayUserAvailable,
@@ -24,6 +26,10 @@ public class ReconciliationDtos {
             String displayExpectedLedgerTotal,
             BigDecimal difference,
             String displayDifference,
+            BigDecimal hotWalletBalance,
+            String displayHotWalletBalance,
+            BigDecimal coverageDifference,
+            String displayCoverageDifference,
             String status
     ) {
     }

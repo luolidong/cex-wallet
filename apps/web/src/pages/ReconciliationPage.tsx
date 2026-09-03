@@ -24,6 +24,17 @@ export function ReconciliationPage() {
     { title: '确认提现', dataIndex: 'displayConfirmedWithdrawals', width: 130 },
     { title: '待完成提现', dataIndex: 'displayPendingWithdrawals', width: 140 },
     { title: '期望账本', dataIndex: 'displayExpectedLedgerTotal', width: 130 },
+    { title: '热钱包链上余额', dataIndex: 'displayHotWalletBalance', width: 160, render: (value) => value || '未配置' },
+    {
+      title: '资金覆盖差额',
+      dataIndex: 'displayCoverageDifference',
+      width: 140,
+      render: (value, record) => (
+        <Typography.Text type={record.coverageDifference && BigInt(record.coverageDifference) < 0n ? 'danger' : undefined}>
+          {value || '-'}
+        </Typography.Text>
+      )
+    },
     {
       title: '差额',
       dataIndex: 'displayDifference',
@@ -58,7 +69,7 @@ export function ReconciliationPage() {
           type={mismatchCount === 0 ? 'success' : 'error'}
           showIcon
           message={mismatchCount === 0 ? '账务检查通过' : `发现 ${mismatchCount} 个 Token 账务不一致`}
-          description="当前检查口径：账本总额 = 确认充值 - 确认提现。mock 入账不纳入实际账本总额，待完成提现已冻结在账本内，不会从期望账本里扣除。"
+          description="当前检查口径：账本总额 = 确认充值 - 确认提现；热钱包链上余额需要覆盖账本总额。mock 入账不纳入实际账本总额。"
         />
         <Table
           rowKey="tokenId"

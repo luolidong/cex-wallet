@@ -58,13 +58,14 @@ public class ReconciliationRepository {
                   FROM withdrawals
                   GROUP BY token_id
                 )
-                SELECT t.id AS token_id, t.symbol, t.token_type, t.decimals,
+                SELECT t.id AS token_id, t.symbol, t.token_type, t.token_address, c.rpc_url, t.decimals,
                   COALESCE(ls.user_available, 0) AS user_available,
                   COALESCE(ls.user_frozen, 0) AS user_frozen,
                   COALESCE(ds.confirmed_deposits, 0) AS confirmed_deposits,
                   COALESCE(ws.pending_withdrawals, 0) AS pending_withdrawals,
                   COALESCE(ws.confirmed_withdrawals, 0) AS confirmed_withdrawals
                 FROM tokens t
+                JOIN chains c ON c.id = t.chain_id
                 LEFT JOIN ledger_summary ls ON ls.token_id = t.id
                 LEFT JOIN deposit_summary ds ON ds.token_id = t.id
                 LEFT JOIN withdrawal_summary ws ON ws.token_id = t.id
@@ -86,6 +87,8 @@ public class ReconciliationRepository {
                 rs.getLong("token_id"),
                 rs.getString("symbol"),
                 rs.getString("token_type"),
+                rs.getString("token_address"),
+                rs.getString("rpc_url"),
                 decimals,
                 userAvailable,
                 display(userAvailable, decimals),
@@ -103,6 +106,10 @@ public class ReconciliationRepository {
                 display(expectedLedgerTotal, decimals),
                 difference,
                 display(difference, decimals),
+                null,
+                "",
+                null,
+                "",
                 difference.compareTo(BigDecimal.ZERO) == 0 ? "MATCHED" : "MISMATCHED"
         );
     }

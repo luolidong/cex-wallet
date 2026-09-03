@@ -4,6 +4,8 @@ export interface TokenReconciliation {
   tokenId: number;
   symbol: string;
   tokenType: string;
+  tokenAddress?: string;
+  rpcUrl: string;
   decimals: number;
   userAvailable: string;
   displayUserAvailable: string;
@@ -21,6 +23,10 @@ export interface TokenReconciliation {
   displayExpectedLedgerTotal: string;
   difference: string;
   displayDifference: string;
+  hotWalletBalance?: string;
+  displayHotWalletBalance: string;
+  coverageDifference?: string;
+  displayCoverageDifference: string;
   status: string;
 }
 
