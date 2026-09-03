@@ -35,7 +35,7 @@ public class WithdrawalService {
 
     @Transactional
     public WithdrawalView create(Long userId, Long tokenId, String toAddress, BigDecimal amount) {
-        userService.findById(userId);
+        userService.requireActive(userId);
         TokenWithdrawConfig token = withdrawalRepository.findTokenConfig(tokenId);
         if (!Boolean.TRUE.equals(token.withdrawEnabled()) || !"ACTIVE".equals(token.tokenStatus())) {
             throw new BusinessException("WITHDRAW_DISABLED", "token withdraw disabled", HttpStatus.BAD_REQUEST);

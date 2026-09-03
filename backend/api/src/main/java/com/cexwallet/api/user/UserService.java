@@ -32,5 +32,31 @@ public class UserService {
         return userRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", "user not found", HttpStatus.NOT_FOUND));
     }
-}
 
+    public User updateStatus(Long id, String status) {
+        String normalizedStatus = normalizeStatus(status);
+        findById(id);
+        if (!userRepository.updateStatus(id, normalizedStatus)) {
+            throw new BusinessException("NOT_FOUND", "user not found", HttpStatus.NOT_FOUND);
+        }
+        return findById(id);
+    }
+
+    public User requireActive(Long id) {
+        User user = findById(id);
+        if (!"ACTIVE".equals(user.status())) {
+            throw new BusinessException("USER_NOT_ACTIVE", "user is not active", HttpStatus.BAD_REQUEST);
+        }
+        return user;
+    }
+
+    private String normalizeStatus(String status) {
+        if (status == null || status.isBlank()) {
+            throw new BusinessException("INVALID_STATUS", "status is required", HttpStatus.BAD_REQUEST);
+        }
+        if (!"ACTIVE".equals(status) && !"FROZEN".equals(status)) {
+            throw new BusinessException("INVALID_STATUS", "status must be ACTIVE or FROZEN", HttpStatus.BAD_REQUEST);
+        }
+        return status;
+    }
+}

@@ -41,6 +41,15 @@ public class UserRepository {
         return users.stream().findFirst();
     }
 
+    public boolean updateStatus(Long id, String status) {
+        int updated = jdbcTemplate.update("""
+                UPDATE users
+                SET status = ?, updated_at = NOW()
+                WHERE id = ?
+                """, status, id);
+        return updated == 1;
+    }
+
     private User mapRow(ResultSet rs, int rowNum) throws SQLException {
         return new User(
                 rs.getLong("id"),
@@ -53,4 +62,3 @@ public class UserRepository {
         );
     }
 }
-

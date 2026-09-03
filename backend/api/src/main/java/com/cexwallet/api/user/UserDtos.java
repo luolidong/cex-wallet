@@ -10,5 +10,9 @@ public class UserDtos {
             String phone
     ) {
     }
-}
 
+    public record UpdateUserStatusRequest(
+            @NotBlank String status
+    ) {
+    }
+}

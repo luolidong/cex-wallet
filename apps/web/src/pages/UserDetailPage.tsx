@@ -176,6 +176,7 @@ export function UserDetailPage() {
   ];
 
   const user = userQuery.data;
+  const isUserFrozen = user?.status === 'FROZEN';
   const balances = balancesQuery.data || [];
   const selectedBalance = balances.find((item) => item.tokenId === selectedTokenId);
   const selectedWithdrawalRule = withdrawalRulesQuery.data?.find((item) => item.tokenId === selectedTokenId);
@@ -228,10 +229,14 @@ export function UserDetailPage() {
           <Button icon={<ReloadOutlined />} onClick={refreshUserAssetData}>
             刷新资产数据
           </Button>
-          <Button loading={createAddressMutation.isPending} onClick={() => createAddressMutation.mutate()}>
+          <Button
+            disabled={isUserFrozen}
+            loading={createAddressMutation.isPending}
+            onClick={() => createAddressMutation.mutate()}
+          >
             生成充值地址
           </Button>
-          <Button type="primary" icon={<ExportOutlined />} onClick={openWithdrawModal}>
+          <Button type="primary" icon={<ExportOutlined />} disabled={isUserFrozen} onClick={openWithdrawModal}>
             申请提现
           </Button>
         </Space>
@@ -242,12 +247,21 @@ export function UserDetailPage() {
           <Descriptions.Item label="用户 ID">{user?.id}</Descriptions.Item>
           <Descriptions.Item label="用户名">{user?.username}</Descriptions.Item>
           <Descriptions.Item label="状态">
-            {user?.status ? <Tag color={user.status === 'ACTIVE' ? 'green' : 'default'}>{user.status}</Tag> : '-'}
+            {user?.status ? <Tag color={user.status === 'ACTIVE' ? 'green' : 'red'}>{user.status}</Tag> : '-'}
           </Descriptions.Item>
           <Descriptions.Item label="邮箱">{user?.email || '-'}</Descriptions.Item>
           <Descriptions.Item label="手机">{user?.phone || '-'}</Descriptions.Item>
           <Descriptions.Item label="KYC">L{user?.kycLevel ?? 0}</Descriptions.Item>
         </Descriptions>
+
+        {isUserFrozen ? (
+          <Alert
+            type="warning"
+            showIcon
+            message="该用户已冻结"
+            description="冻结用户不能生成新的充值地址，也不能申请提现。已有充值地址和历史资金记录不会被删除。"
+          />
+        ) : null}
 
         <div>
           <Typography.Title level={4}>资产余额</Typography.Title>

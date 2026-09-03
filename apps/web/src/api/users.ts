@@ -96,6 +96,11 @@ export async function createUser(input: CreateUserInput): Promise<User> {
   return response.data.data;
 }
 
+export async function updateUserStatus(id: number, status: string): Promise<User> {
+  const response = await http.put<{ success: boolean; data: User }>(`/users/${id}/status`, { status });
+  return response.data.data;
+}
+
 export async function getUser(userId: number): Promise<User> {
   const response = await http.get<{ success: boolean; data: User }>(`/users/${userId}`);
   return response.data.data;

@@ -25,7 +25,7 @@ public class WalletService {
     }
 
     public WalletView getOrCreateDepositWallet(Long userId, Long chainId) {
-        userService.findById(userId);
+        userService.requireActive(userId);
         if (!walletRepository.chainExists(chainId)) {
             throw new BusinessException("NOT_FOUND", "chain not found", HttpStatus.NOT_FOUND);
         }

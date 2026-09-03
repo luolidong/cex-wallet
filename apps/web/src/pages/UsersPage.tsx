@@ -1,10 +1,10 @@
-import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { LockOutlined, PlusOutlined, ReloadOutlined, UnlockOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Form, Input, Modal, Space, Table, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createUser, listUsers, type CreateUserInput, type User } from '../api/users';
+import { createUser, listUsers, updateUserStatus, type CreateUserInput, type User } from '../api/users';
 
 export function UsersPage() {
   const [createOpen, setCreateOpen] = useState(false);
@@ -25,7 +25,17 @@ export function UsersPage() {
       form.resetFields();
       await queryClient.invalidateQueries({ queryKey: ['users'] });
       navigate(`/users/${user.id}`);
-    }
+    },
+    onError: (error) => showRequestError(error, '创建失败')
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) => updateUserStatus(id, status),
+    onSuccess: async (user) => {
+      message.success(user.status === 'ACTIVE' ? '用户已恢复' : '用户已冻结');
+      await queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: (error) => showRequestError(error, '状态更新失败')
   });
 
   const columns: ColumnsType<User> = [
@@ -58,7 +68,7 @@ export function UsersPage() {
       title: '状态',
       dataIndex: 'status',
       width: 100,
-      render: (value: string) => <Tag color={value === 'ACTIVE' ? 'green' : 'default'}>{value}</Tag>
+      render: (value: string) => <Tag color={value === 'ACTIVE' ? 'green' : 'red'}>{value}</Tag>
     },
     {
       title: '创建时间',
@@ -68,11 +78,33 @@ export function UsersPage() {
     },
     {
       title: '操作',
-      width: 100,
+      width: 190,
       render: (_, record) => (
-        <Button type="link" onClick={() => navigate(`/users/${record.id}`)}>
-          详情
-        </Button>
+        <Space>
+          <Button type="link" onClick={() => navigate(`/users/${record.id}`)}>
+            详情
+          </Button>
+          {record.status === 'ACTIVE' ? (
+            <Button
+              size="small"
+              danger
+              icon={<LockOutlined />}
+              loading={statusMutation.isPending}
+              onClick={() => confirmStatusChange(record, 'FROZEN')}
+            >
+              冻结
+            </Button>
+          ) : (
+            <Button
+              size="small"
+              icon={<UnlockOutlined />}
+              loading={statusMutation.isPending}
+              onClick={() => confirmStatusChange(record, 'ACTIVE')}
+            >
+              恢复
+            </Button>
+          )}
+        </Space>
       )
     }
   ];
@@ -80,6 +112,19 @@ export function UsersPage() {
   async function handleCreate() {
     const values = await form.validateFields();
     createMutation.mutate(values);
+  }
+
+  function confirmStatusChange(user: User, status: string) {
+    const freeze = status === 'FROZEN';
+    Modal.confirm({
+      title: freeze ? '冻结用户' : '恢复用户',
+      content: freeze
+        ? `冻结 ${user.username} 后，该用户不能生成充值地址，也不能申请提现。`
+        : `恢复 ${user.username} 后，该用户可以继续生成充值地址和申请提现。`,
+      okText: freeze ? '确认冻结' : '确认恢复',
+      okButtonProps: { danger: freeze },
+      onOk: () => statusMutation.mutateAsync({ id: user.id, status })
+    });
   }
 
   return (
@@ -131,3 +176,18 @@ export function UsersPage() {
   );
 }
 
+function showRequestError(error: unknown, fallback: string) {
+  if (typeof error === 'object' && error && 'response' in error) {
+    const response = (error as { response?: { data?: { error?: { message?: string }; message?: string } } }).response;
+    const apiMessage = response?.data?.error?.message || response?.data?.message;
+    if (apiMessage) {
+      message.error(`${fallback}：${apiMessage}`);
+      return;
+    }
+  }
+  if (error instanceof Error && error.message) {
+    message.error(`${fallback}：${error.message}`);
+    return;
+  }
+  message.error(fallback);
+}

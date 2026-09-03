@@ -107,6 +107,7 @@ function actionLabel(action: string) {
     PLATFORM_WALLET_CREATE: '新增平台钱包',
     PLATFORM_WALLET_UPDATE: '修改平台钱包',
     PLATFORM_WALLET_DISABLE: '停用平台钱包',
+    USER_STATUS_UPDATE: '修改用户状态',
     ADMIN_ACCOUNT_CREATE: '新增后台账号',
     ADMIN_ACCOUNT_STATUS_UPDATE: '修改后台账号状态',
     ADMIN_ACCOUNT_ROLES_UPDATE: '修改后台账号角色',
@@ -129,6 +130,7 @@ function targetTypeLabel(targetType: string) {
     PLATFORM_WALLET: '平台钱包',
     ADMIN_USER: '后台账号',
     ROLE: '角色',
+    USER: '用户',
     WALLET: '充值地址',
     WITHDRAWAL: '提现单',
     WITHDRAWAL_ADDRESS: '提现地址'
