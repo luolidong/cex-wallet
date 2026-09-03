@@ -1,17 +1,26 @@
-import { CheckOutlined, CloseOutlined, CloudUploadOutlined, ReloadOutlined } from '@ant-design/icons';
+import { CheckOutlined, CloseOutlined, CloudUploadOutlined, ReloadOutlined, RollbackOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Form, Input, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useState } from 'react';
-import { approveWithdrawal, broadcastWithdrawal, confirmWithdrawal, listWithdrawals, rejectWithdrawal } from '../api/withdrawals';
+import {
+  approveWithdrawal,
+  broadcastWithdrawal,
+  confirmWithdrawal,
+  failWithdrawal,
+  listWithdrawals,
+  rejectWithdrawal
+} from '../api/withdrawals';
 import type { Withdrawal } from '../api/users';
 
 export function WithdrawalReviewPage() {
   const [rejecting, setRejecting] = useState<Withdrawal>();
   const [confirming, setConfirming] = useState<Withdrawal>();
+  const [failing, setFailing] = useState<Withdrawal>();
   const [status, setStatus] = useState('ALL');
   const [form] = Form.useForm<{ reason: string }>();
   const [confirmForm] = Form.useForm<{ txHash: string }>();
+  const [failForm] = Form.useForm<{ reason: string }>();
   const queryClient = useQueryClient();
   const withdrawalsQuery = useQuery({
     queryKey: ['withdrawals', status],
@@ -50,6 +59,17 @@ export function WithdrawalReviewPage() {
     onError: (error) => showRequestError(error, '确认失败')
   });
 
+  const failMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason?: string }) => failWithdrawal(id, reason),
+    onSuccess: async () => {
+      message.success('提现已标记失败，冻结余额已退回');
+      setFailing(undefined);
+      failForm.resetFields();
+      await queryClient.invalidateQueries({ queryKey: ['withdrawals'] });
+    },
+    onError: (error) => showRequestError(error, '标记失败失败')
+  });
+
   const broadcastMutation = useMutation({
     mutationFn: broadcastWithdrawal,
     onSuccess: async () => {
@@ -86,7 +106,7 @@ export function WithdrawalReviewPage() {
     },
     {
       title: '操作',
-      width: 180,
+      width: 240,
       render: (_, record) => (
         <Space>
           {record.status === 'PENDING_APPROVAL' ? (
@@ -106,20 +126,30 @@ export function WithdrawalReviewPage() {
             </>
           ) : null}
           {record.status === 'APPROVED' ? (
-            <Button
-              size="small"
-              type="primary"
-              icon={<CloudUploadOutlined />}
-              loading={broadcastMutation.isPending}
-              onClick={() => broadcastMutation.mutate(record.id)}
-            >
-              广播
-            </Button>
+            <>
+              <Button
+                size="small"
+                type="primary"
+                icon={<CloudUploadOutlined />}
+                loading={broadcastMutation.isPending}
+                onClick={() => broadcastMutation.mutate(record.id)}
+              >
+                广播
+              </Button>
+              <Button size="small" icon={<RollbackOutlined />} onClick={() => setFailing(record)}>
+                失败退款
+              </Button>
+            </>
           ) : null}
           {record.status === 'BROADCASTED' ? (
-            <Button size="small" type="primary" icon={<CheckOutlined />} onClick={() => setConfirming(record)}>
-              确认成功
-            </Button>
+            <>
+              <Button size="small" type="primary" icon={<CheckOutlined />} onClick={() => setConfirming(record)}>
+                确认成功
+              </Button>
+              <Button size="small" icon={<RollbackOutlined />} onClick={() => setFailing(record)}>
+                失败退款
+              </Button>
+            </>
           ) : null}
           {!['PENDING_APPROVAL', 'APPROVED', 'BROADCASTED'].includes(record.status) ? (
             <Typography.Text type="secondary">无操作</Typography.Text>
@@ -145,6 +175,14 @@ export function WithdrawalReviewPage() {
     confirmMutation.mutate({ id: confirming.id, txHash: values.txHash });
   }
 
+  async function handleFail() {
+    if (!failing) {
+      return;
+    }
+    const values = await failForm.validateFields();
+    failMutation.mutate({ id: failing.id, reason: values.reason });
+  }
+
   return (
     <>
       <div className="page-toolbar">
@@ -162,7 +200,8 @@ export function WithdrawalReviewPage() {
               { value: 'APPROVED', label: '已批准' },
               { value: 'BROADCASTED', label: '已广播' },
               { value: 'CONFIRMED', label: '已确认' },
-              { value: 'REJECTED', label: '已拒绝' }
+              { value: 'REJECTED', label: '已拒绝' },
+              { value: 'FAILED', label: '失败已退款' }
             ]}
             style={{ width: 140 }}
           />
@@ -210,6 +249,25 @@ export function WithdrawalReviewPage() {
           </Form.Item>
         </Form>
       </Modal>
+
+      <Modal
+        title="提现失败退款"
+        open={Boolean(failing)}
+        okText="确认退款"
+        okButtonProps={{ danger: true }}
+        confirmLoading={failMutation.isPending}
+        onOk={handleFail}
+        onCancel={() => setFailing(undefined)}
+      >
+        <Typography.Paragraph type="secondary">
+          适用于链上广播失败、交易丢弃或人工确认不会成功的提现单。确认后会把冻结的提现金额和手续费退回用户可用余额。
+        </Typography.Paragraph>
+        <Form form={failForm} layout="vertical">
+          <Form.Item label="失败原因" name="reason" rules={[{ required: true, message: '请输入失败原因' }]}>
+            <Input.TextArea rows={4} placeholder="例如：链上交易失败、手续费不足、交易长时间未打包" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </>
   );
 }
@@ -228,6 +286,9 @@ function statusColor(status: string) {
     return 'green';
   }
   if (status === 'REJECTED') {
+    return 'red';
+  }
+  if (status === 'FAILED') {
     return 'red';
   }
   return 'default';

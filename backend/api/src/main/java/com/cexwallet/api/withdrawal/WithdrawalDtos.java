@@ -64,6 +64,9 @@ public class WithdrawalDtos {
     public record RejectWithdrawalRequest(String reason) {
     }
 
+    public record FailWithdrawalRequest(String reason) {
+    }
+
     public record ConfirmWithdrawalRequest(String txHash) {
     }
 }

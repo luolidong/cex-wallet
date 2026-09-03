@@ -10,7 +10,7 @@
 提现记录
 ```
 
-页面用于全局查询提现申请、审核、广播和确认记录。
+页面用于全局查询提现申请、审核、广播、确认和失败退款记录。
 
 ## 2. 查询能力
 
@@ -32,8 +32,9 @@
 2. 进入 `提现记录` 页面。
 3. 不输入筛选条件，预期能看到最近提现记录。
 4. 输入用户 ID 或提现地址查询，预期只展示匹配记录。
-5. 按 `PENDING_APPROVAL`、`APPROVED`、`BROADCASTED`、`CONFIRMED`、`REJECTED` 筛选。
+5. 按 `PENDING_APPROVAL`、`APPROVED`、`BROADCASTED`、`CONFIRMED`、`REJECTED`、`FAILED` 筛选。
 6. 在 `提现审核` 页面推进状态后，回到 `提现记录` 页面确认状态同步变化。
+7. 对一笔 `APPROVED` 或 `BROADCASTED` 提现执行 `失败退款`，预期记录状态变成 `FAILED`，并展示失败原因。
 
 ## 4. 权限说明
 

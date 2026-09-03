@@ -115,6 +115,7 @@ function actionLabel(action: string) {
     WALLET_DISABLE: '停用充值地址',
     WITHDRAWAL_APPROVE: '批准提现',
     WITHDRAWAL_REJECT: '拒绝提现',
+    WITHDRAWAL_FAIL: '提现失败退款',
     WITHDRAWAL_BROADCAST: '广播提现',
     WITHDRAWAL_CONFIRM: '确认提现'
   };
@@ -147,7 +148,7 @@ function formatDetail(detailJson?: string) {
 }
 
 function actionColor(action: string) {
-  if (action.includes('REJECT') || action.includes('DISABLE')) {
+  if (action.includes('REJECT') || action.includes('FAIL') || action.includes('DISABLE')) {
     return 'red';
   }
   if (action.includes('APPROVE') || action.includes('ENABLE')) {

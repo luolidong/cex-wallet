@@ -104,7 +104,23 @@ CONFIRMED
 
 用户冻结余额会被最终扣除。
 
-## 8. 常见问题
+## 8. 验证失败退款
+
+如果提现广播失败、交易长时间不确认，或人工确认链上不会成功：
+
+```text
+提现审核 -> 已批准/已广播 -> 失败退款
+```
+
+预期结果：
+
+- 提现状态变成 `FAILED`
+- 用户冻结余额减少
+- 用户可用余额增加，增加金额为 `提现数量 + 手续费`
+- `账务流水` 可以看到 `WITHDRAWAL_FAIL_REFUND`
+- `审计日志` 可以看到 `提现失败退款`
+
+## 9. 常见问题
 
 - 如果 signer 返回 `tokenAddress is required for ERC20 withdrawal`，说明数据库 `tokens.token_address` 没配，或 Java API 没重启。
 - 如果广播失败提示余额不足，说明 signer 热钱包没有 MockERC20，需要给热钱包转入测试 token。

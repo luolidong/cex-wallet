@@ -161,6 +161,15 @@ public class WithdrawalRepository {
         return updated == 1;
     }
 
+    public boolean fail(Long withdrawalId, String expectedStatus, String reason) {
+        int updated = jdbcTemplate.update("""
+                UPDATE withdrawals
+                SET status = 'FAILED', reject_reason = ?, updated_at = NOW()
+                WHERE id = ? AND status = ?
+                """, reason, withdrawalId, expectedStatus);
+        return updated == 1;
+    }
+
     public boolean confirm(Long withdrawalId, String expectedStatus, String txHash) {
         int updated = jdbcTemplate.update("""
                 UPDATE withdrawals

@@ -149,6 +149,38 @@ public class WithdrawalService {
     }
 
     @Transactional
+    public WithdrawalView fail(Long withdrawalId, String reason) {
+        WithdrawalView withdrawal = findWithdrawal(withdrawalId);
+        if (!"APPROVED".equals(withdrawal.status()) && !"BROADCASTED".equals(withdrawal.status())) {
+            throw new BusinessException("INVALID_STATUS", "withdrawal is not approved or broadcasted", HttpStatus.BAD_REQUEST);
+        }
+
+        BigDecimal totalAmount = withdrawal.amount().add(withdrawal.fee());
+        Long availableAccountId = ledgerRepository.getOrCreateAccount(OWNER_TYPE_USER, withdrawal.userId(), ACCOUNT_AVAILABLE, withdrawal.tokenId());
+        Long frozenAccountId = ledgerRepository.getOrCreateAccount(OWNER_TYPE_USER, withdrawal.userId(), ACCOUNT_FROZEN, withdrawal.tokenId());
+        String idempotencyKey = "withdrawal:fail:" + withdrawal.id();
+        String normalizedReason = reason == null || reason.isBlank() ? "withdrawal failed" : reason;
+
+        if (ledgerRepository.findJournalByIdempotencyKey(idempotencyKey).isEmpty()) {
+            String journalNo = "J" + Instant.now().toEpochMilli() + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+            Long journalId = ledgerRepository.createJournal(
+                    journalNo,
+                    "WITHDRAWAL_FAIL_REFUND",
+                    String.valueOf(withdrawal.id()),
+                    idempotencyKey,
+                    normalizedReason
+            );
+            ledgerRepository.createEntry(journalId, frozenAccountId, "DEBIT", withdrawal.tokenId(), totalAmount);
+            ledgerRepository.createEntry(journalId, availableAccountId, "CREDIT", withdrawal.tokenId(), totalAmount);
+        }
+
+        if (!withdrawalRepository.fail(withdrawalId, withdrawal.status(), normalizedReason)) {
+            throw new BusinessException("INVALID_STATUS", "withdrawal status changed", HttpStatus.CONFLICT);
+        }
+        return findWithdrawal(withdrawalId);
+    }
+
+    @Transactional
     public WithdrawalView confirm(Long withdrawalId, String txHash) {
         WithdrawalView withdrawal = findWithdrawal(withdrawalId);
         if (!"APPROVED".equals(withdrawal.status()) && !"BROADCASTED".equals(withdrawal.status())) {
@@ -205,7 +237,7 @@ public class WithdrawalService {
         if (status == null || status.isBlank()) {
             return null;
         }
-        if (!List.of("PENDING_APPROVAL", "APPROVED", "BROADCASTED", "CONFIRMED", "REJECTED").contains(status)) {
+        if (!List.of("PENDING_APPROVAL", "APPROVED", "BROADCASTED", "CONFIRMED", "REJECTED", "FAILED").contains(status)) {
             throw new BusinessException("INVALID_STATUS", "invalid withdrawal status", HttpStatus.BAD_REQUEST);
         }
         return status;

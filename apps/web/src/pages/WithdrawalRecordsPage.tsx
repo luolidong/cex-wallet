@@ -120,7 +120,8 @@ export function WithdrawalRecordsPage() {
                 { value: 'APPROVED', label: 'APPROVED' },
                 { value: 'BROADCASTED', label: 'BROADCASTED' },
                 { value: 'CONFIRMED', label: 'CONFIRMED' },
-                { value: 'REJECTED', label: 'REJECTED' }
+                { value: 'REJECTED', label: 'REJECTED' },
+                { value: 'FAILED', label: 'FAILED' }
               ]}
             />
           </Form.Item>
@@ -168,6 +169,9 @@ function statusColor(status: string) {
     return 'green';
   }
   if (status === 'REJECTED') {
+    return 'red';
+  }
+  if (status === 'FAILED') {
     return 'red';
   }
   return 'default';

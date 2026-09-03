@@ -4,6 +4,7 @@ import com.cexwallet.api.audit.AuditLogService;
 import com.cexwallet.api.auth.AdminUser;
 import com.cexwallet.api.common.ApiResponse;
 import com.cexwallet.api.withdrawal.WithdrawalDtos.ConfirmWithdrawalRequest;
+import com.cexwallet.api.withdrawal.WithdrawalDtos.FailWithdrawalRequest;
 import com.cexwallet.api.withdrawal.WithdrawalDtos.RejectWithdrawalRequest;
 import com.cexwallet.api.withdrawal.WithdrawalDtos.WithdrawalView;
 import java.util.List;
@@ -48,6 +49,18 @@ public class AdminWithdrawalController {
         String reason = request == null ? null : request.reason();
         WithdrawalView withdrawal = withdrawalService.reject(id, reason);
         auditLogService.record(adminUser, "WITHDRAWAL_REJECT", "WITHDRAWAL", id, "拒绝提现：" + reason, request);
+        return ApiResponse.ok(withdrawal);
+    }
+
+    @PostMapping("/{id}/fail")
+    public ApiResponse<WithdrawalView> fail(
+            @PathVariable Long id,
+            @RequestBody(required = false) FailWithdrawalRequest request,
+            @AuthenticationPrincipal AdminUser adminUser
+    ) {
+        String reason = request == null ? null : request.reason();
+        WithdrawalView withdrawal = withdrawalService.fail(id, reason);
+        auditLogService.record(adminUser, "WITHDRAWAL_FAIL", "WITHDRAWAL", id, "提现失败退款：" + withdrawal.displayAmount() + " " + withdrawal.symbol(), request);
         return ApiResponse.ok(withdrawal);
     }
 
