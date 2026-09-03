@@ -41,6 +41,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/assets/**").hasAuthority("asset:manage")
                         .requestMatchers("/api/risk/**").hasAuthority("risk:manage")
                         .requestMatchers("/api/withdrawals/**").hasAuthority("withdrawal:review")
+                        .requestMatchers(HttpMethod.GET, "/api/deposits/**").hasAuthority("wallet:read")
                         .requestMatchers(HttpMethod.GET, "/api/wallets/**").hasAuthority("wallet:read")
                         .requestMatchers("/api/wallets/**").hasAuthority("wallet:manage")
                         .requestMatchers("/api/users/*/withdrawals/**").hasAuthority("withdrawal:review")

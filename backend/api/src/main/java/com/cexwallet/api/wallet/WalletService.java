@@ -75,6 +75,16 @@ public class WalletService {
         return walletRepository.findUserDeposits(userId);
     }
 
+    public PageResponse<DepositView> findDeposits(String keyword, Long chainId, Long tokenId, String status, int page, int pageSize) {
+        String normalizedStatus = normalizeDepositStatus(status);
+        int normalizedPage = Math.max(page, 1);
+        int normalizedPageSize = Math.min(Math.max(pageSize, 1), 100);
+        int offset = (normalizedPage - 1) * normalizedPageSize;
+        List<DepositView> items = walletRepository.findDeposits(keyword, chainId, tokenId, normalizedStatus, normalizedPageSize, offset);
+        long total = walletRepository.countDeposits(keyword, chainId, tokenId, normalizedStatus);
+        return new PageResponse<>(items, normalizedPage, normalizedPageSize, total);
+    }
+
     private void updateWalletStatus(Long id, String status) {
         if (!walletRepository.updateWalletStatus(id, status)) {
             throw new BusinessException("NOT_FOUND", "wallet not found", HttpStatus.NOT_FOUND);
@@ -87,6 +97,16 @@ public class WalletService {
         }
         if (!"ACTIVE".equals(status) && !"INACTIVE".equals(status)) {
             throw new BusinessException("INVALID_STATUS", "status must be ACTIVE or INACTIVE", HttpStatus.BAD_REQUEST);
+        }
+        return status;
+    }
+
+    private String normalizeDepositStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
+        if (!"DETECTED".equals(status) && !"CONFIRMED".equals(status)) {
+            throw new BusinessException("INVALID_STATUS", "status must be DETECTED or CONFIRMED", HttpStatus.BAD_REQUEST);
         }
         return status;
     }

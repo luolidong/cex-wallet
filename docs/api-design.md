@@ -340,6 +340,27 @@ wallet:manage
 wallet:manage
 ```
 
+### GET /api/deposits
+
+后台全局查询充值记录。
+
+查询参数：
+
+```text
+keyword
+chainId
+tokenId
+status
+page
+pageSize
+```
+
+需要权限：
+
+```text
+wallet:read
+```
+
 ### GET /api/users/{userId}/wallets
 
 查询用户充值地址。

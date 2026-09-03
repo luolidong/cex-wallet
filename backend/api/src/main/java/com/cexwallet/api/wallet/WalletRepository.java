@@ -19,6 +19,9 @@ public class WalletRepository {
     private record WalletQuery(StringBuilder sql, List<Object> args) {
     }
 
+    private record DepositQuery(StringBuilder sql, List<Object> args) {
+    }
+
     public WalletRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
@@ -125,6 +128,66 @@ public class WalletRepository {
                 ORDER BY d.id DESC
                 LIMIT 50
                 """, this::mapDeposit, userId);
+    }
+
+    public List<DepositView> findDeposits(String keyword, Long chainId, Long tokenId, String status, int limit, int offset) {
+        DepositQuery query = buildDepositQuery("""
+                SELECT d.id, d.user_id, d.wallet_id, d.chain_id, c.name AS chain_name, d.token_id, t.symbol, t.decimals,
+                  d.tx_hash, d.event_index, d.from_address, d.to_address, d.amount, d.block_number,
+                  d.confirmation_count, d.status, d.detected_at, d.confirmed_at
+                FROM deposits d
+                JOIN chains c ON c.id = d.chain_id
+                JOIN tokens t ON t.id = d.token_id
+                JOIN users u ON u.id = d.user_id
+                """, keyword, chainId, tokenId, status);
+        query.sql().append(" ORDER BY d.id DESC LIMIT ? OFFSET ?");
+        query.args().add(limit);
+        query.args().add(offset);
+        return jdbcTemplate.query(query.sql().toString(), this::mapDeposit, query.args().toArray());
+    }
+
+    public long countDeposits(String keyword, Long chainId, Long tokenId, String status) {
+        DepositQuery query = buildDepositQuery("""
+                SELECT COUNT(*)
+                FROM deposits d
+                JOIN users u ON u.id = d.user_id
+                """, keyword, chainId, tokenId, status);
+        Long count = jdbcTemplate.queryForObject(query.sql().toString(), Long.class, query.args().toArray());
+        return count == null ? 0 : count;
+    }
+
+    private DepositQuery buildDepositQuery(String selectSql, String keyword, Long chainId, Long tokenId, String status) {
+        StringBuilder sql = new StringBuilder(selectSql).append(" WHERE 1 = 1");
+        List<Object> args = new ArrayList<>();
+        if (keyword != null && !keyword.isBlank()) {
+            String trimmedKeyword = keyword.trim();
+            String likeKeyword = "%" + trimmedKeyword.toLowerCase() + "%";
+            sql.append("""
+                     AND (lower(d.tx_hash) LIKE ?
+                       OR lower(d.from_address) LIKE ?
+                       OR lower(d.to_address) LIKE ?
+                       OR lower(u.username) LIKE ?
+                       OR CAST(d.user_id AS TEXT) = ?)
+                    """);
+            args.add(likeKeyword);
+            args.add(likeKeyword);
+            args.add(likeKeyword);
+            args.add(likeKeyword);
+            args.add(trimmedKeyword);
+        }
+        if (chainId != null) {
+            sql.append(" AND d.chain_id = ?");
+            args.add(chainId);
+        }
+        if (tokenId != null) {
+            sql.append(" AND d.token_id = ?");
+            args.add(tokenId);
+        }
+        if (status != null && !status.isBlank()) {
+            sql.append(" AND d.status = ?");
+            args.add(status);
+        }
+        return new DepositQuery(sql, args);
     }
 
     private WalletView mapWallet(ResultSet rs, int rowNum) throws SQLException {
