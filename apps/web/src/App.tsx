@@ -14,6 +14,7 @@ import { SystemStatusPage } from './pages/SystemStatusPage';
 import { UserDetailPage } from './pages/UserDetailPage';
 import { UsersPage } from './pages/UsersPage';
 import { WalletManagementPage } from './pages/WalletManagementPage';
+import { WithdrawalRecordsPage } from './pages/WithdrawalRecordsPage';
 import { WithdrawalReviewPage } from './pages/WithdrawalReviewPage';
 
 export function App() {
@@ -28,6 +29,7 @@ export function App() {
             <Route path="users/:userId" element={<UserDetailPage />} />
             <Route path="wallets" element={<WalletManagementPage />} />
             <Route path="deposits" element={<DepositManagementPage />} />
+            <Route path="withdrawal-records" element={<WithdrawalRecordsPage />} />
             <Route path="withdrawals/review" element={<WithdrawalReviewPage />} />
             <Route path="scanner/status" element={<ScannerStatusPage />} />
             <Route path="risk/settings" element={<RiskSettingsPage />} />

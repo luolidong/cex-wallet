@@ -1,9 +1,11 @@
 package com.cexwallet.api.withdrawal;
 
 import com.cexwallet.api.withdrawal.WithdrawalDtos.WithdrawalView;
+import com.cexwallet.api.withdrawal.WithdrawalDtos.AdminWithdrawalRecordView;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -12,6 +14,9 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class WithdrawalRepository {
     private final JdbcTemplate jdbcTemplate;
+
+    private record WithdrawalQuery(StringBuilder sql, List<Object> args) {
+    }
 
     public WithdrawalRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
@@ -188,6 +193,65 @@ public class WithdrawalRepository {
                 """, this::mapWithdrawal, userId);
     }
 
+    public List<AdminWithdrawalRecordView> findRecords(String keyword, Long chainId, Long tokenId, String status, int limit, int offset) {
+        WithdrawalQuery query = buildRecordQuery("""
+                SELECT w.id, w.user_id, u.username, w.chain_id, c.name AS chain_name,
+                  w.token_id, t.symbol, t.token_type, t.token_address, t.decimals,
+                  w.to_address, w.amount, w.fee, w.status, w.tx_hash, w.reject_reason,
+                  w.requested_at, w.created_at
+                FROM withdrawals w
+                JOIN users u ON u.id = w.user_id
+                JOIN chains c ON c.id = w.chain_id
+                JOIN tokens t ON t.id = w.token_id
+                """, keyword, chainId, tokenId, status);
+        query.sql().append(" ORDER BY w.id DESC LIMIT ? OFFSET ?");
+        query.args().add(limit);
+        query.args().add(offset);
+        return jdbcTemplate.query(query.sql().toString(), this::mapAdminWithdrawalRecord, query.args().toArray());
+    }
+
+    public long countRecords(String keyword, Long chainId, Long tokenId, String status) {
+        WithdrawalQuery query = buildRecordQuery("""
+                SELECT COUNT(*)
+                FROM withdrawals w
+                JOIN users u ON u.id = w.user_id
+                """, keyword, chainId, tokenId, status);
+        Long count = jdbcTemplate.queryForObject(query.sql().toString(), Long.class, query.args().toArray());
+        return count == null ? 0 : count;
+    }
+
+    private WithdrawalQuery buildRecordQuery(String selectSql, String keyword, Long chainId, Long tokenId, String status) {
+        StringBuilder sql = new StringBuilder(selectSql).append(" WHERE 1 = 1");
+        List<Object> args = new ArrayList<>();
+        if (keyword != null && !keyword.isBlank()) {
+            String trimmedKeyword = keyword.trim();
+            String likeKeyword = "%" + trimmedKeyword.toLowerCase() + "%";
+            sql.append("""
+                     AND (lower(COALESCE(w.tx_hash, '')) LIKE ?
+                       OR lower(w.to_address) LIKE ?
+                       OR lower(u.username) LIKE ?
+                       OR CAST(w.user_id AS TEXT) = ?)
+                    """);
+            args.add(likeKeyword);
+            args.add(likeKeyword);
+            args.add(likeKeyword);
+            args.add(trimmedKeyword);
+        }
+        if (chainId != null) {
+            sql.append(" AND w.chain_id = ?");
+            args.add(chainId);
+        }
+        if (tokenId != null) {
+            sql.append(" AND w.token_id = ?");
+            args.add(tokenId);
+        }
+        if (status != null && !status.isBlank()) {
+            sql.append(" AND w.status = ?");
+            args.add(status);
+        }
+        return new WithdrawalQuery(sql, args);
+    }
+
     private WithdrawalView mapWithdrawal(ResultSet rs, int rowNum) throws SQLException {
         BigDecimal amount = rs.getBigDecimal("amount");
         BigDecimal fee = rs.getBigDecimal("fee");
@@ -195,6 +259,34 @@ public class WithdrawalRepository {
         return new WithdrawalView(
                 rs.getLong("id"),
                 rs.getLong("user_id"),
+                rs.getLong("chain_id"),
+                rs.getString("chain_name"),
+                rs.getLong("token_id"),
+                rs.getString("symbol"),
+                rs.getString("token_type"),
+                rs.getString("token_address"),
+                decimals,
+                rs.getString("to_address"),
+                amount,
+                display(amount, decimals),
+                fee,
+                display(fee, decimals),
+                rs.getString("status"),
+                rs.getString("tx_hash"),
+                rs.getString("reject_reason"),
+                rs.getTimestamp("requested_at").toInstant(),
+                rs.getTimestamp("created_at").toInstant()
+        );
+    }
+
+    private AdminWithdrawalRecordView mapAdminWithdrawalRecord(ResultSet rs, int rowNum) throws SQLException {
+        BigDecimal amount = rs.getBigDecimal("amount");
+        BigDecimal fee = rs.getBigDecimal("fee");
+        int decimals = rs.getInt("decimals");
+        return new AdminWithdrawalRecordView(
+                rs.getLong("id"),
+                rs.getLong("user_id"),
+                rs.getString("username"),
                 rs.getLong("chain_id"),
                 rs.getString("chain_name"),
                 rs.getLong("token_id"),

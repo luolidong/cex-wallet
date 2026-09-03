@@ -37,6 +37,30 @@ public class WithdrawalDtos {
     ) {
     }
 
+    public record AdminWithdrawalRecordView(
+            Long id,
+            Long userId,
+            String username,
+            Long chainId,
+            String chainName,
+            Long tokenId,
+            String symbol,
+            String tokenType,
+            String tokenAddress,
+            Integer decimals,
+            String toAddress,
+            BigDecimal amount,
+            String displayAmount,
+            BigDecimal fee,
+            String displayFee,
+            String status,
+            String txHash,
+            String rejectReason,
+            Instant requestedAt,
+            Instant createdAt
+    ) {
+    }
+
     public record RejectWithdrawalRequest(String reason) {
     }
 

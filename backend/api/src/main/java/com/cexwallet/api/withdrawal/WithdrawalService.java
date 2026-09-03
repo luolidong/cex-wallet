@@ -1,8 +1,10 @@
 package com.cexwallet.api.withdrawal;
 
 import com.cexwallet.api.common.BusinessException;
+import com.cexwallet.api.common.PageResponse;
 import com.cexwallet.api.ledger.LedgerRepository;
 import com.cexwallet.api.user.UserService;
+import com.cexwallet.api.withdrawal.WithdrawalDtos.AdminWithdrawalRecordView;
 import com.cexwallet.api.withdrawal.WithdrawalDtos.WithdrawalView;
 import com.cexwallet.api.withdrawal.WithdrawalRepository.TokenWithdrawConfig;
 import java.math.BigDecimal;
@@ -92,6 +94,16 @@ public class WithdrawalService {
 
     public List<WithdrawalView> findAll(String status) {
         return withdrawalRepository.findAll(status);
+    }
+
+    public PageResponse<AdminWithdrawalRecordView> findRecords(String keyword, Long chainId, Long tokenId, String status, int page, int pageSize) {
+        String normalizedStatus = normalizeRecordStatus(status);
+        int normalizedPage = Math.max(page, 1);
+        int normalizedPageSize = Math.min(Math.max(pageSize, 1), 100);
+        int offset = (normalizedPage - 1) * normalizedPageSize;
+        List<AdminWithdrawalRecordView> items = withdrawalRepository.findRecords(keyword, chainId, tokenId, normalizedStatus, normalizedPageSize, offset);
+        long total = withdrawalRepository.countRecords(keyword, chainId, tokenId, normalizedStatus);
+        return new PageResponse<>(items, normalizedPage, normalizedPageSize, total);
     }
 
     @Transactional
@@ -187,5 +199,15 @@ public class WithdrawalService {
     private WithdrawalView findWithdrawal(Long withdrawalId) {
         return withdrawalRepository.findOptionalById(withdrawalId)
                 .orElseThrow(() -> new BusinessException("NOT_FOUND", "withdrawal not found", HttpStatus.NOT_FOUND));
+    }
+
+    private String normalizeRecordStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
+        if (!List.of("PENDING_APPROVAL", "APPROVED", "BROADCASTED", "CONFIRMED", "REJECTED").contains(status)) {
+            throw new BusinessException("INVALID_STATUS", "invalid withdrawal status", HttpStatus.BAD_REQUEST);
+        }
+        return status;
     }
 }

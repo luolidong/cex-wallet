@@ -32,6 +32,7 @@ cex-wallet_demo       原 demo 参考实现
 - [API 设计](docs/api-design.md)
 - [地址管理](docs/wallet-management.md)
 - [充值记录](docs/deposit-management.md)
+- [提现记录](docs/withdrawal-records.md)
 
 ## 本地开发要求
 

@@ -361,6 +361,29 @@ pageSize
 wallet:read
 ```
 
+## 8.1 提现记录查询接口
+
+### GET /api/withdrawal-records
+
+后台全局查询提现记录。
+
+查询参数：
+
+```text
+keyword
+chainId
+tokenId
+status
+page
+pageSize
+```
+
+需要权限：
+
+```text
+withdrawal:review
+```
+
 ### GET /api/users/{userId}/wallets
 
 查询用户充值地址。

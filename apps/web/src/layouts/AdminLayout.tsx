@@ -30,6 +30,8 @@ export function AdminLayout() {
       ? 'wallets'
       : location.pathname.startsWith('/deposits')
         ? 'deposits'
+        : location.pathname.startsWith('/withdrawal-records')
+          ? 'withdrawal-records'
       : location.pathname.startsWith('/withdrawals/review')
         ? 'withdrawals/review'
         : location.pathname.startsWith('/scanner/status')
@@ -62,6 +64,7 @@ export function AdminLayout() {
     can('user:read') ? { key: 'users', icon: <UserOutlined />, label: '用户管理' } : null,
     can('wallet:read') ? { key: 'wallets', icon: <WalletOutlined />, label: '地址管理' } : null,
     can('wallet:read') ? { key: 'deposits', icon: <ImportOutlined />, label: '充值记录' } : null,
+    can('withdrawal:review') ? { key: 'withdrawal-records', icon: <FileSearchOutlined />, label: '提现记录' } : null,
     can('withdrawal:review') ? { key: 'withdrawals/review', icon: <AuditOutlined />, label: '提现审核' } : null,
     can('scanner:read') ? { key: 'scanner/status', icon: <RadarChartOutlined />, label: '扫描状态' } : null,
     can('risk:manage') ? { key: 'risk/settings', icon: <SafetyCertificateOutlined />, label: '风控配置' } : null,
