@@ -1,4 +1,4 @@
-import { AuditOutlined, DashboardOutlined, FileSearchOutlined, MonitorOutlined, RadarChartOutlined, ReconciliationOutlined, SafetyCertificateOutlined, UserOutlined, WalletOutlined } from '@ant-design/icons';
+import { AuditOutlined, DashboardOutlined, FileSearchOutlined, IdcardOutlined, MonitorOutlined, RadarChartOutlined, ReconciliationOutlined, SafetyCertificateOutlined, UserOutlined, WalletOutlined } from '@ant-design/icons';
 import { Button, Layout, Menu, Space, Typography } from 'antd';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { clearSession, getStoredUser } from '../auth/session';
@@ -19,13 +19,15 @@ export function AdminLayout() {
             ? 'risk/settings'
             : location.pathname.startsWith('/assets')
               ? 'assets'
-              : location.pathname.startsWith('/system/status')
-                ? 'system/status'
-                : location.pathname.startsWith('/audit-logs')
-                  ? 'audit-logs'
-                  : location.pathname.startsWith('/reconciliation')
-                    ? 'reconciliation'
-                    : 'dashboard';
+              : location.pathname.startsWith('/admin-management')
+                ? 'admin-management'
+                : location.pathname.startsWith('/system/status')
+                  ? 'system/status'
+                  : location.pathname.startsWith('/audit-logs')
+                    ? 'audit-logs'
+                    : location.pathname.startsWith('/reconciliation')
+                      ? 'reconciliation'
+                      : 'dashboard';
 
   function handleLogout() {
     clearSession();
@@ -48,6 +50,7 @@ export function AdminLayout() {
             { key: 'scanner/status', icon: <RadarChartOutlined />, label: '扫描状态' },
             { key: 'risk/settings', icon: <SafetyCertificateOutlined />, label: '风控配置' },
             { key: 'assets', icon: <WalletOutlined />, label: '资产管理' },
+            { key: 'admin-management', icon: <IdcardOutlined />, label: '权限管理' },
             { key: 'system/status', icon: <MonitorOutlined />, label: '系统状态' },
             { key: 'audit-logs', icon: <FileSearchOutlined />, label: '审计日志' },
             { key: 'reconciliation', icon: <ReconciliationOutlined />, label: '账务对账' }

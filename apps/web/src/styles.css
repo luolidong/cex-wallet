@@ -44,6 +44,10 @@ body,
   width: 360px;
 }
 
+.login-error {
+  margin-bottom: 16px;
+}
+
 .page-toolbar {
   display: flex;
   align-items: flex-start;

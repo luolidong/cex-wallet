@@ -107,6 +107,10 @@ function actionLabel(action: string) {
     PLATFORM_WALLET_CREATE: '新增平台钱包',
     PLATFORM_WALLET_UPDATE: '修改平台钱包',
     PLATFORM_WALLET_DISABLE: '停用平台钱包',
+    ADMIN_ACCOUNT_CREATE: '新增后台账号',
+    ADMIN_ACCOUNT_STATUS_UPDATE: '修改后台账号状态',
+    ADMIN_ACCOUNT_ROLES_UPDATE: '修改后台账号角色',
+    ROLE_PERMISSIONS_UPDATE: '修改角色权限',
     WITHDRAWAL_APPROVE: '批准提现',
     WITHDRAWAL_REJECT: '拒绝提现',
     WITHDRAWAL_BROADCAST: '广播提现',
@@ -120,6 +124,8 @@ function targetTypeLabel(targetType: string) {
     CHAIN: '链',
     TOKEN: 'Token',
     PLATFORM_WALLET: '平台钱包',
+    ADMIN_USER: '后台账号',
+    ROLE: '角色',
     WITHDRAWAL: '提现单',
     WITHDRAWAL_ADDRESS: '提现地址'
   };

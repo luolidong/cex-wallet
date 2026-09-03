@@ -189,6 +189,71 @@ SHA256(REQUEST_BODY)
 
 获取当前登录管理员信息。
 
+## 6.1 权限管理接口
+
+### GET /api/admin-management/admins
+
+查询后台管理员账号列表。
+
+### POST /api/admin-management/admins
+
+创建后台管理员账号。
+
+请求：
+
+```json
+{
+  "username": "operator001",
+  "password": "123456",
+  "displayName": "运营一号",
+  "roles": ["admin"]
+}
+```
+
+### PUT /api/admin-management/admins/{id}/status
+
+修改后台管理员状态。
+
+请求：
+
+```json
+{
+  "status": "ACTIVE"
+}
+```
+
+### PUT /api/admin-management/admins/{id}/roles
+
+修改后台管理员角色。
+
+请求：
+
+```json
+{
+  "roles": ["admin"]
+}
+```
+
+### GET /api/admin-management/roles
+
+查询角色和角色拥有的权限。
+
+### PUT /api/admin-management/roles/{roleCode}/permissions
+
+修改角色权限。
+
+请求：
+
+```json
+{
+  "permissions": ["system:read", "user:read", "withdrawal:review"]
+}
+```
+
+### GET /api/admin-management/permissions
+
+查询系统权限字典。
+
 ## 7. 用户接口
 
 ### GET /api/users

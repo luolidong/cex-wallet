@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { RequireAuth } from './auth/RequireAuth';
 import { AdminLayout } from './layouts/AdminLayout';
+import { AdminManagementPage } from './pages/AdminManagementPage';
 import { AssetManagementPage } from './pages/AssetManagementPage';
 import { AuditLogsPage } from './pages/AuditLogsPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -27,6 +28,7 @@ export function App() {
             <Route path="scanner/status" element={<ScannerStatusPage />} />
             <Route path="risk/settings" element={<RiskSettingsPage />} />
             <Route path="assets" element={<AssetManagementPage />} />
+            <Route path="admin-management" element={<AdminManagementPage />} />
             <Route path="system/status" element={<SystemStatusPage />} />
             <Route path="audit-logs" element={<AuditLogsPage />} />
             <Route path="reconciliation" element={<ReconciliationPage />} />
