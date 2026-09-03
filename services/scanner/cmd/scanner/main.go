@@ -75,7 +75,6 @@ func (s *scanState) setWithdrawalResult(result withdrawal.Result, err error) {
 func main() {
 	cfg := config.Load()
 	apiClient := api.NewClient(cfg.APIBaseURL, cfg.InternalToken)
-	mockScanner := scan.NewMockScanner(apiClient)
 	evmScanner := evm.NewScanner(apiClient)
 	withdrawalConfirmer := withdrawal.NewConfirmer(apiClient)
 	state := &scanState{}
@@ -91,36 +90,15 @@ func main() {
 				"status":  "UP",
 				"time":    time.Now().UTC().Format(time.RFC3339),
 				"apiBase": cfg.APIBaseURL,
+				"mock":    cfg.EnableMockEndpoints,
 				"scanner": state.snapshot(),
 			},
 		})
 	})
 
-	http.HandleFunc("/mock/deposits", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		var input scan.MockDepositInput
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		result, err := mockScanner.SubmitMockDeposit(r.Context(), input)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadGateway)
-			return
-		}
-
-		writeJSON(w, healthResponse{
-			Success: true,
-			Message: "ok",
-			Data: map[string]interface{}{
-				"deposit": result,
-			},
-		})
-	})
+	if cfg.EnableMockEndpoints {
+		registerMockEndpoints(apiClient)
+	}
 
 	http.HandleFunc("/config", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -137,30 +115,6 @@ func main() {
 			Message: "ok",
 			Data: map[string]interface{}{
 				"config": result,
-			},
-		})
-	})
-
-	http.HandleFunc("/mock/cursors", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		var input api.UpdateCursorRequest
-		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		result, err := apiClient.UpdateCursor(r.Context(), input)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadGateway)
-			return
-		}
-		writeJSON(w, healthResponse{
-			Success: true,
-			Message: "ok",
-			Data: map[string]interface{}{
-				"cursor": result,
 			},
 		})
 	})
@@ -206,8 +160,61 @@ func main() {
 		})
 	})
 
-	log.Printf("scanner service listening on :%s, api=%s", cfg.Port, cfg.APIBaseURL)
+	log.Printf("scanner service listening on :%s, api=%s, mock=%t", cfg.Port, cfg.APIBaseURL, cfg.EnableMockEndpoints)
 	log.Fatal(http.ListenAndServe(":"+cfg.Port, nil))
+}
+
+func registerMockEndpoints(apiClient *api.Client) {
+	mockScanner := scan.NewMockScanner(apiClient)
+	http.HandleFunc("/mock/deposits", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var input scan.MockDepositInput
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		result, err := mockScanner.SubmitMockDeposit(r.Context(), input)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+
+		writeJSON(w, healthResponse{
+			Success: true,
+			Message: "ok",
+			Data: map[string]interface{}{
+				"deposit": result,
+			},
+		})
+	})
+
+	http.HandleFunc("/mock/cursors", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		var input api.UpdateCursorRequest
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		result, err := apiClient.UpdateCursor(r.Context(), input)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+		writeJSON(w, healthResponse{
+			Success: true,
+			Message: "ok",
+			Data: map[string]interface{}{
+				"cursor": result,
+			},
+		})
+	})
 }
 
 func startEVMScanLoop(scanner *evm.Scanner, interval time.Duration, state *scanState) {

@@ -45,8 +45,8 @@ cex-wallet_demo       原 demo 参考实现
 
 ```bash
 cd apps/web
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 Java API：
@@ -60,6 +60,7 @@ Go Scanner：
 
 ```bash
 cd services/scanner
+cp .env.example .env
 go run ./cmd/scanner
 ```
 
@@ -75,6 +76,7 @@ Go Signer：
 
 ```bash
 cd services/signer
+cp .env.example .env
 go run ./cmd/signer
 ```
 
@@ -82,6 +84,19 @@ go run ./cmd/signer
 
 ```bash
 docker compose -f infra/docker-compose.yml up postgres redis
+```
+
+Docker Compose 启动应用服务前，先准备 compose 配置：
+
+```bash
+cp infra/env/scanner.compose.env.example infra/env/scanner.compose.env
+cp infra/env/signer.compose.env.example infra/env/signer.compose.env
+```
+
+然后启动：
+
+```bash
+docker compose -f infra/docker-compose.yml --profile app up
 ```
 
 ## 当前进度
@@ -92,7 +107,12 @@ docker compose -f infra/docker-compose.yml up postgres redis
 - API 设计文档已完成。
 - 项目骨架已初始化。
 
-下一步：实现 Java 后端基础能力。
+Go 服务启动时会读取各自目录下的 `.env`。开发 mock 入口默认关闭，本地需要 scanner mock 接口时修改 `services/scanner/.env`：
+
+```text
+ENABLE_MOCK_ENDPOINTS=true
+```
+
 默认后台管理员：
 
 ```text

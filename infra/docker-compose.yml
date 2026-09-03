@@ -57,10 +57,8 @@ services:
     command: go run ./cmd/scanner
     profiles:
       - app
-    environment:
-      PORT: 8092
-      API_BASE_URL: http://api:8080
-      INTERNAL_API_TOKEN: dev-internal-token
+    env_file:
+      - ./env/scanner.compose.env
     ports:
       - "8092:8092"
     volumes:
@@ -73,8 +71,8 @@ services:
     command: go run ./cmd/signer
     profiles:
       - app
-    environment:
-      PORT: 8091
+    env_file:
+      - ./env/signer.compose.env
     ports:
       - "8091:8091"
     volumes:

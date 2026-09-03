@@ -1,6 +1,8 @@
 .DS_Store
 .env
 .env.local
+infra/env/*.env
+!infra/env/*.env.example
 node_modules/
 dist/
 build/
