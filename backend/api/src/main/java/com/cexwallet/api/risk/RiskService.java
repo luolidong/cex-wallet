@@ -3,6 +3,7 @@ package com.cexwallet.api.risk;
 import com.cexwallet.api.common.BusinessException;
 import com.cexwallet.api.risk.RiskDtos.BlacklistAddressView;
 import com.cexwallet.api.risk.RiskDtos.ChainOptionView;
+import com.cexwallet.api.risk.RiskDtos.KycWithdrawalLimitView;
 import com.cexwallet.api.risk.RiskDtos.WithdrawalRuleView;
 import java.math.BigDecimal;
 import java.util.List;
@@ -26,6 +27,10 @@ public class RiskService {
         return riskRepository.findChains();
     }
 
+    public List<KycWithdrawalLimitView> findKycWithdrawalLimits() {
+        return riskRepository.findKycWithdrawalLimits();
+    }
+
     @Transactional
     public List<WithdrawalRuleView> updateWithdrawalRule(Long tokenId, BigDecimal maxWithdrawAmount, BigDecimal dailyWithdrawLimit) {
         if (maxWithdrawAmount != null && dailyWithdrawLimit != null && maxWithdrawAmount.compareTo(dailyWithdrawLimit) > 0) {
@@ -35,6 +40,17 @@ public class RiskService {
             throw new BusinessException("NOT_FOUND", "token not found", HttpStatus.NOT_FOUND);
         }
         return riskRepository.findWithdrawalRules();
+    }
+
+    @Transactional
+    public List<KycWithdrawalLimitView> updateKycWithdrawalLimit(Long id, BigDecimal maxWithdrawAmount, BigDecimal dailyWithdrawLimit, Boolean withdrawEnabled) {
+        if (Boolean.TRUE.equals(withdrawEnabled) && maxWithdrawAmount != null && dailyWithdrawLimit != null && maxWithdrawAmount.compareTo(dailyWithdrawLimit) > 0) {
+            throw new BusinessException("INVALID_WITHDRAW_LIMIT", "single withdrawal limit cannot exceed daily limit", HttpStatus.BAD_REQUEST);
+        }
+        if (!riskRepository.updateKycWithdrawalLimit(id, maxWithdrawAmount, dailyWithdrawLimit, withdrawEnabled)) {
+            throw new BusinessException("NOT_FOUND", "kyc withdrawal limit not found", HttpStatus.NOT_FOUND);
+        }
+        return riskRepository.findKycWithdrawalLimits();
     }
 
     public List<BlacklistAddressView> findBlacklistAddresses() {

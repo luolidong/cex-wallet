@@ -7,16 +7,24 @@ import {
   addBlacklistAddress,
   disableBlacklistAddress,
   enableBlacklistAddress,
+  listKycWithdrawalLimits,
   listBlacklistAddresses,
   listRiskChains,
   listWithdrawalRules,
+  updateKycWithdrawalLimit,
   updateWithdrawalRule
 } from '../api/risk';
-import type { BlacklistAddress, WithdrawalRule } from '../api/risk';
+import type { BlacklistAddress, KycWithdrawalLimit, WithdrawalRule } from '../api/risk';
 
 interface RuleFormValues {
   maxWithdrawAmount?: string;
   dailyWithdrawLimit?: string;
+}
+
+interface KycLimitFormValues {
+  maxWithdrawAmount?: string;
+  dailyWithdrawLimit?: string;
+  withdrawEnabled: boolean;
 }
 
 interface BlacklistFormValues {
@@ -27,8 +35,10 @@ interface BlacklistFormValues {
 
 export function RiskSettingsPage() {
   const [editingRule, setEditingRule] = useState<WithdrawalRule>();
+  const [editingKycLimit, setEditingKycLimit] = useState<KycWithdrawalLimit>();
   const [blacklistOpen, setBlacklistOpen] = useState(false);
   const [ruleForm] = Form.useForm<RuleFormValues>();
+  const [kycLimitForm] = Form.useForm<KycLimitFormValues>();
   const [blacklistForm] = Form.useForm<BlacklistFormValues>();
   const queryClient = useQueryClient();
 
@@ -39,6 +49,10 @@ export function RiskSettingsPage() {
   const blacklistQuery = useQuery({
     queryKey: ['risk', 'withdrawal-address-blacklist'],
     queryFn: listBlacklistAddresses
+  });
+  const kycLimitsQuery = useQuery({
+    queryKey: ['risk', 'kyc-withdrawal-limits'],
+    queryFn: listKycWithdrawalLimits
   });
   const chainsQuery = useQuery({
     queryKey: ['risk', 'chains'],
@@ -75,6 +89,22 @@ export function RiskSettingsPage() {
     },
     onError: (error) => showRequestError(error, '添加黑名单失败')
   });
+
+  const updateKycLimitMutation = useMutation({
+    mutationFn: ({ limit, values }: { limit: KycWithdrawalLimit; values: KycLimitFormValues }) => updateKycWithdrawalLimit(limit.id, {
+      maxWithdrawAmount: toBaseUnit(values.maxWithdrawAmount || '', limit.decimals),
+      dailyWithdrawLimit: toBaseUnit(values.dailyWithdrawLimit || '', limit.decimals),
+      withdrawEnabled: values.withdrawEnabled
+    }),
+    onSuccess: async () => {
+      message.success('KYC 提现限额已保存');
+      setEditingKycLimit(undefined);
+      kycLimitForm.resetFields();
+      await queryClient.invalidateQueries({ queryKey: ['risk', 'kyc-withdrawal-limits'] });
+    },
+    onError: (error) => showRequestError(error, '保存 KYC 提现限额失败')
+  });
+
 
   const disableBlacklistMutation = useMutation({
     mutationFn: disableBlacklistAddress,
@@ -166,11 +196,42 @@ export function RiskSettingsPage() {
     }
   ];
 
+  const kycLimitColumns: ColumnsType<KycWithdrawalLimit> = [
+    { title: 'Token', dataIndex: 'symbol', width: 100 },
+    { title: 'KYC', dataIndex: 'kycLevel', width: 100, render: (value) => `L${value}` },
+    {
+      title: '提现',
+      dataIndex: 'withdrawEnabled',
+      width: 90,
+      render: (value) => <Tag color={value ? 'green' : 'red'}>{value ? '允许' : '禁止'}</Tag>
+    },
+    { title: '单笔上限', dataIndex: 'displayMaxWithdrawAmount', width: 140, render: (value) => value || '不限' },
+    { title: '每日上限', dataIndex: 'displayDailyWithdrawLimit', width: 140, render: (value) => value || '不限' },
+    {
+      title: '操作',
+      width: 100,
+      render: (_, record) => (
+        <Button size="small" icon={<EditOutlined />} onClick={() => openKycLimitModal(record)}>
+          编辑
+        </Button>
+      )
+    }
+  ];
+
   function openRuleModal(rule: WithdrawalRule) {
     setEditingRule(rule);
     ruleForm.setFieldsValue({
       maxWithdrawAmount: rule.displayMaxWithdrawAmount,
       dailyWithdrawLimit: rule.displayDailyWithdrawLimit
+    });
+  }
+
+  function openKycLimitModal(limit: KycWithdrawalLimit) {
+    setEditingKycLimit(limit);
+    kycLimitForm.setFieldsValue({
+      maxWithdrawAmount: limit.displayMaxWithdrawAmount,
+      dailyWithdrawLimit: limit.displayDailyWithdrawLimit,
+      withdrawEnabled: limit.withdrawEnabled
     });
   }
 
@@ -180,6 +241,14 @@ export function RiskSettingsPage() {
     }
     const values = await ruleForm.validateFields();
     updateRuleMutation.mutate({ tokenId: editingRule.tokenId, values });
+  }
+
+  async function handleSaveKycLimit() {
+    if (!editingKycLimit) {
+      return;
+    }
+    const values = await kycLimitForm.validateFields();
+    updateKycLimitMutation.mutate({ limit: editingKycLimit, values });
   }
 
   async function handleAddBlacklist() {
@@ -199,6 +268,7 @@ export function RiskSettingsPage() {
             icon={<ReloadOutlined />}
             onClick={() => {
               rulesQuery.refetch();
+              kycLimitsQuery.refetch();
               blacklistQuery.refetch();
             }}
           >
@@ -218,6 +288,17 @@ export function RiskSettingsPage() {
             columns={ruleColumns}
             dataSource={rulesQuery.data || []}
             loading={rulesQuery.isLoading}
+            pagination={false}
+          />
+        </section>
+
+        <section>
+          <Typography.Title level={4}>KYC 提现限额</Typography.Title>
+          <Table
+            rowKey="id"
+            columns={kycLimitColumns}
+            dataSource={kycLimitsQuery.data || []}
+            loading={kycLimitsQuery.isLoading}
             pagination={false}
           />
         </section>
@@ -248,6 +329,32 @@ export function RiskSettingsPage() {
           </Form.Item>
           <Form.Item label="每日上限" name="dailyWithdrawLimit" rules={[{ required: true, message: '请输入每日上限' }]}>
             <Input placeholder="例如 500000" suffix={editingRule?.symbol} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={editingKycLimit ? `编辑 ${editingKycLimit.symbol} L${editingKycLimit.kycLevel} 提现限额` : '编辑 KYC 提现限额'}
+        open={Boolean(editingKycLimit)}
+        okText="保存"
+        confirmLoading={updateKycLimitMutation.isPending}
+        onOk={handleSaveKycLimit}
+        onCancel={() => setEditingKycLimit(undefined)}
+      >
+        <Form form={kycLimitForm} layout="vertical">
+          <Form.Item label="提现权限" name="withdrawEnabled" rules={[{ required: true, message: '请选择提现权限' }]}>
+            <Select
+              options={[
+                { value: true, label: '允许提现' },
+                { value: false, label: '禁止提现' }
+              ]}
+            />
+          </Form.Item>
+          <Form.Item label="单笔上限" name="maxWithdrawAmount" rules={[{ required: true, message: '请输入单笔上限' }]}>
+            <Input placeholder="例如 1000" suffix={editingKycLimit?.symbol} />
+          </Form.Item>
+          <Form.Item label="每日上限" name="dailyWithdrawLimit" rules={[{ required: true, message: '请输入每日上限' }]}>
+            <Input placeholder="例如 5000" suffix={editingKycLimit?.symbol} />
           </Form.Item>
         </Form>
       </Modal>

@@ -3,9 +3,11 @@ package com.cexwallet.api.withdrawal;
 import com.cexwallet.api.common.BusinessException;
 import com.cexwallet.api.common.PageResponse;
 import com.cexwallet.api.ledger.LedgerRepository;
+import com.cexwallet.api.user.User;
 import com.cexwallet.api.user.UserService;
 import com.cexwallet.api.withdrawal.WithdrawalDtos.AdminWithdrawalRecordView;
 import com.cexwallet.api.withdrawal.WithdrawalDtos.WithdrawalView;
+import com.cexwallet.api.withdrawal.WithdrawalRepository.KycWithdrawLimit;
 import com.cexwallet.api.withdrawal.WithdrawalRepository.TokenWithdrawConfig;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -35,7 +37,7 @@ public class WithdrawalService {
 
     @Transactional
     public WithdrawalView create(Long userId, Long tokenId, String toAddress, BigDecimal amount) {
-        userService.requireActive(userId);
+        User user = userService.requireActive(userId);
         TokenWithdrawConfig token = withdrawalRepository.findTokenConfig(tokenId);
         if (!Boolean.TRUE.equals(token.withdrawEnabled()) || !"ACTIVE".equals(token.tokenStatus())) {
             throw new BusinessException("WITHDRAW_DISABLED", "token withdraw disabled", HttpStatus.BAD_REQUEST);
@@ -54,6 +56,21 @@ public class WithdrawalService {
         }
 
         BigDecimal totalAmount = amount.add(token.withdrawFee());
+        KycWithdrawLimit kycLimit = withdrawalRepository.findKycWithdrawLimit(tokenId, user.kycLevel());
+        if (kycLimit != null) {
+            if (!Boolean.TRUE.equals(kycLimit.withdrawEnabled())) {
+                throw new BusinessException("KYC_WITHDRAW_DISABLED", "withdrawal disabled for current KYC level", HttpStatus.BAD_REQUEST);
+            }
+            if (kycLimit.maxWithdrawAmount() != null && amount.compareTo(kycLimit.maxWithdrawAmount()) > 0) {
+                throw new BusinessException("KYC_WITHDRAW_AMOUNT_EXCEEDS_SINGLE_LIMIT", "amount exceeds KYC single withdrawal limit", HttpStatus.BAD_REQUEST);
+            }
+            if (kycLimit.dailyWithdrawLimit() != null) {
+                BigDecimal todayAmount = withdrawalRepository.findTodayWithdrawalAmount(userId, tokenId);
+                if (todayAmount.add(totalAmount).compareTo(kycLimit.dailyWithdrawLimit()) > 0) {
+                    throw new BusinessException("KYC_WITHDRAW_AMOUNT_EXCEEDS_DAILY_LIMIT", "amount exceeds KYC daily withdrawal limit", HttpStatus.BAD_REQUEST);
+                }
+            }
+        }
         if (token.dailyWithdrawLimit() != null) {
             BigDecimal todayAmount = withdrawalRepository.findTodayWithdrawalAmount(userId, tokenId);
             if (todayAmount.add(totalAmount).compareTo(token.dailyWithdrawLimit()) > 0) {

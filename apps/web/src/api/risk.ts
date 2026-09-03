@@ -30,6 +30,25 @@ export interface UpdateWithdrawalRuleInput {
   dailyWithdrawLimit?: string;
 }
 
+export interface KycWithdrawalLimit {
+  id: number;
+  tokenId: number;
+  symbol: string;
+  decimals: number;
+  kycLevel: number;
+  maxWithdrawAmount?: string;
+  displayMaxWithdrawAmount: string;
+  dailyWithdrawLimit?: string;
+  displayDailyWithdrawLimit: string;
+  withdrawEnabled: boolean;
+}
+
+export interface UpdateKycWithdrawalLimitInput {
+  maxWithdrawAmount?: string;
+  dailyWithdrawLimit?: string;
+  withdrawEnabled: boolean;
+}
+
 export interface BlacklistAddress {
   id: number;
   chainId: number;
@@ -58,6 +77,16 @@ export async function listRiskChains(): Promise<ChainOption[]> {
 
 export async function updateWithdrawalRule(tokenId: number, input: UpdateWithdrawalRuleInput): Promise<WithdrawalRule[]> {
   const response = await http.put<{ success: boolean; data: WithdrawalRule[] }>(`/risk/withdrawal-rules/${tokenId}`, input);
+  return response.data.data;
+}
+
+export async function listKycWithdrawalLimits(): Promise<KycWithdrawalLimit[]> {
+  const response = await http.get<{ success: boolean; data: KycWithdrawalLimit[] }>('/risk/kyc-withdrawal-limits');
+  return response.data.data;
+}
+
+export async function updateKycWithdrawalLimit(id: number, input: UpdateKycWithdrawalLimitInput): Promise<KycWithdrawalLimit[]> {
+  const response = await http.put<{ success: boolean; data: KycWithdrawalLimit[] }>(`/risk/kyc-withdrawal-limits/${id}`, input);
   return response.data.data;
 }
 

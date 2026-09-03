@@ -40,6 +40,27 @@ public class RiskDtos {
     ) {
     }
 
+    public record KycWithdrawalLimitView(
+            Long id,
+            Long tokenId,
+            String symbol,
+            Integer decimals,
+            Integer kycLevel,
+            BigDecimal maxWithdrawAmount,
+            String displayMaxWithdrawAmount,
+            BigDecimal dailyWithdrawLimit,
+            String displayDailyWithdrawLimit,
+            Boolean withdrawEnabled
+    ) {
+    }
+
+    public record UpdateKycWithdrawalLimitRequest(
+            @PositiveOrZero BigDecimal maxWithdrawAmount,
+            @PositiveOrZero BigDecimal dailyWithdrawLimit,
+            @NotNull Boolean withdrawEnabled
+    ) {
+    }
+
     public record BlacklistAddressView(
             Long id,
             Long chainId,

@@ -104,6 +104,7 @@ function actionLabel(action: string) {
     BLACKLIST_ADDRESS_ADD: '添加黑名单地址',
     BLACKLIST_ADDRESS_DISABLE: '停用黑名单地址',
     BLACKLIST_ADDRESS_ENABLE: '启用黑名单地址',
+    KYC_WITHDRAWAL_LIMIT_UPDATE: '修改 KYC 提现限额',
     PLATFORM_WALLET_CREATE: '新增平台钱包',
     PLATFORM_WALLET_UPDATE: '修改平台钱包',
     PLATFORM_WALLET_DISABLE: '停用平台钱包',
@@ -132,6 +133,7 @@ function targetTypeLabel(targetType: string) {
     ADMIN_USER: '后台账号',
     ROLE: '角色',
     USER: '用户',
+    KYC_WITHDRAWAL_LIMIT: 'KYC 提现限额',
     WALLET: '充值地址',
     WITHDRAWAL: '提现单',
     WITHDRAWAL_ADDRESS: '提现地址'

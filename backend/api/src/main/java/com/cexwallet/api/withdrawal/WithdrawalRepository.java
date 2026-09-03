@@ -76,6 +76,19 @@ public class WithdrawalRepository {
         return Boolean.TRUE.equals(exists);
     }
 
+    public KycWithdrawLimit findKycWithdrawLimit(Long tokenId, Integer kycLevel) {
+        List<KycWithdrawLimit> limits = jdbcTemplate.query("""
+                SELECT max_withdraw_amount, daily_withdraw_limit, withdraw_enabled
+                FROM kyc_withdrawal_limits
+                WHERE token_id = ? AND kyc_level = ?
+                """, (rs, rowNum) -> new KycWithdrawLimit(
+                rs.getBigDecimal("max_withdraw_amount"),
+                rs.getBigDecimal("daily_withdraw_limit"),
+                rs.getBoolean("withdraw_enabled")
+        ), tokenId, kycLevel);
+        return limits.stream().findFirst().orElse(null);
+    }
+
     public BigDecimal findTodayWithdrawalAmount(Long userId, Long tokenId) {
         BigDecimal amount = jdbcTemplate.queryForObject("""
                 SELECT COALESCE(SUM(amount + fee), 0)
@@ -333,6 +346,13 @@ public class WithdrawalRepository {
             String tokenStatus,
             Boolean chainWithdrawEnabled,
             String chainStatus
+    ) {
+    }
+
+    public record KycWithdrawLimit(
+            BigDecimal maxWithdrawAmount,
+            BigDecimal dailyWithdrawLimit,
+            Boolean withdrawEnabled
     ) {
     }
 }

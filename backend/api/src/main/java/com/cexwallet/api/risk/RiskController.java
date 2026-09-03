@@ -6,6 +6,8 @@ import com.cexwallet.api.common.ApiResponse;
 import com.cexwallet.api.risk.RiskDtos.AddBlacklistAddressRequest;
 import com.cexwallet.api.risk.RiskDtos.BlacklistAddressView;
 import com.cexwallet.api.risk.RiskDtos.ChainOptionView;
+import com.cexwallet.api.risk.RiskDtos.KycWithdrawalLimitView;
+import com.cexwallet.api.risk.RiskDtos.UpdateKycWithdrawalLimitRequest;
 import com.cexwallet.api.risk.RiskDtos.UpdateWithdrawalRuleRequest;
 import com.cexwallet.api.risk.RiskDtos.WithdrawalRuleView;
 import jakarta.validation.Valid;
@@ -36,6 +38,11 @@ public class RiskController {
         return ApiResponse.ok(riskService.findWithdrawalRules());
     }
 
+    @GetMapping("/kyc-withdrawal-limits")
+    public ApiResponse<List<KycWithdrawalLimitView>> kycWithdrawalLimits() {
+        return ApiResponse.ok(riskService.findKycWithdrawalLimits());
+    }
+
     @GetMapping("/chains")
     public ApiResponse<List<ChainOptionView>> chains() {
         return ApiResponse.ok(riskService.findChains());
@@ -50,6 +57,22 @@ public class RiskController {
         List<WithdrawalRuleView> rules = riskService.updateWithdrawalRule(tokenId, request.maxWithdrawAmount(), request.dailyWithdrawLimit());
         auditLogService.record(adminUser, "WITHDRAWAL_RULE_UPDATE", "TOKEN", tokenId, "修改提现限额配置", request);
         return ApiResponse.ok(rules);
+    }
+
+    @PutMapping("/kyc-withdrawal-limits/{id}")
+    public ApiResponse<List<KycWithdrawalLimitView>> updateKycWithdrawalLimit(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateKycWithdrawalLimitRequest request,
+            @AuthenticationPrincipal AdminUser adminUser
+    ) {
+        List<KycWithdrawalLimitView> limits = riskService.updateKycWithdrawalLimit(
+                id,
+                request.maxWithdrawAmount(),
+                request.dailyWithdrawLimit(),
+                request.withdrawEnabled()
+        );
+        auditLogService.record(adminUser, "KYC_WITHDRAWAL_LIMIT_UPDATE", "KYC_WITHDRAWAL_LIMIT", id, "修改 KYC 提现限额", request);
+        return ApiResponse.ok(limits);
     }
 
     @GetMapping("/withdrawal-address-blacklist")

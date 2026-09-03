@@ -2,6 +2,7 @@ package com.cexwallet.api.risk;
 
 import com.cexwallet.api.risk.RiskDtos.BlacklistAddressView;
 import com.cexwallet.api.risk.RiskDtos.ChainOptionView;
+import com.cexwallet.api.risk.RiskDtos.KycWithdrawalLimitView;
 import com.cexwallet.api.risk.RiskDtos.WithdrawalRuleView;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
@@ -48,6 +49,25 @@ public class RiskRepository {
                 SET max_withdraw_amount = ?, daily_withdraw_limit = ?, updated_at = NOW()
                 WHERE id = ?
                 """, maxWithdrawAmount, dailyWithdrawLimit, tokenId);
+        return updated == 1;
+    }
+
+    public List<KycWithdrawalLimitView> findKycWithdrawalLimits() {
+        return jdbcTemplate.query("""
+                SELECT l.id, l.token_id, t.symbol, t.decimals, l.kyc_level,
+                  l.max_withdraw_amount, l.daily_withdraw_limit, l.withdraw_enabled
+                FROM kyc_withdrawal_limits l
+                JOIN tokens t ON t.id = l.token_id
+                ORDER BY t.id, l.kyc_level
+                """, this::mapKycWithdrawalLimit);
+    }
+
+    public boolean updateKycWithdrawalLimit(Long id, BigDecimal maxWithdrawAmount, BigDecimal dailyWithdrawLimit, Boolean withdrawEnabled) {
+        int updated = jdbcTemplate.update("""
+                UPDATE kyc_withdrawal_limits
+                SET max_withdraw_amount = ?, daily_withdraw_limit = ?, withdraw_enabled = ?, updated_at = NOW()
+                WHERE id = ?
+                """, maxWithdrawAmount, dailyWithdrawLimit, withdrawEnabled, id);
         return updated == 1;
     }
 
@@ -132,6 +152,24 @@ public class RiskRepository {
                 rs.getString("reason"),
                 rs.getString("status"),
                 rs.getTimestamp("created_at").toInstant()
+        );
+    }
+
+    private KycWithdrawalLimitView mapKycWithdrawalLimit(ResultSet rs, int rowNum) throws SQLException {
+        int decimals = rs.getInt("decimals");
+        BigDecimal maxWithdrawAmount = rs.getBigDecimal("max_withdraw_amount");
+        BigDecimal dailyWithdrawLimit = rs.getBigDecimal("daily_withdraw_limit");
+        return new KycWithdrawalLimitView(
+                rs.getLong("id"),
+                rs.getLong("token_id"),
+                rs.getString("symbol"),
+                decimals,
+                rs.getInt("kyc_level"),
+                maxWithdrawAmount,
+                display(maxWithdrawAmount, decimals),
+                dailyWithdrawLimit,
+                display(dailyWithdrawLimit, decimals),
+                rs.getBoolean("withdraw_enabled")
         );
     }
 

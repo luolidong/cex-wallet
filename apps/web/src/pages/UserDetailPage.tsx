@@ -4,7 +4,7 @@ import { Alert, Button, Descriptions, Empty, Form, Input, Modal, Select, Space, 
 import type { ColumnsType } from 'antd/es/table';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { listWithdrawalRules } from '../api/risk';
+import { listKycWithdrawalLimits, listWithdrawalRules } from '../api/risk';
 import {
   createWithdrawal,
   createDepositAddress,
@@ -72,6 +72,10 @@ export function UserDetailPage() {
   const withdrawalRulesQuery = useQuery({
     queryKey: ['risk', 'withdrawal-rules'],
     queryFn: listWithdrawalRules
+  });
+  const kycLimitsQuery = useQuery({
+    queryKey: ['risk', 'kyc-withdrawal-limits'],
+    queryFn: listKycWithdrawalLimits
   });
 
   const createAddressMutation = useMutation({
@@ -194,6 +198,7 @@ export function UserDetailPage() {
   const balances = balancesQuery.data || [];
   const selectedBalance = balances.find((item) => item.tokenId === selectedTokenId);
   const selectedWithdrawalRule = withdrawalRulesQuery.data?.find((item) => item.tokenId === selectedTokenId);
+  const selectedKycLimit = kycLimitsQuery.data?.find((item) => item.tokenId === selectedTokenId && item.kycLevel === user?.kycLevel);
   const withdrawalAmountPreview = selectedBalance ? safeToBaseUnit(displayAmount || '', selectedBalance.decimals) : '';
   const disabledWalletCount = (walletsQuery.data || []).filter((wallet) => wallet.status !== 'ACTIVE').length;
 
@@ -386,14 +391,21 @@ export function UserDetailPage() {
                     const available = BigInt(selectedBalance.available);
                     const minWithdrawAmount = BigInt(selectedWithdrawalRule?.minWithdrawAmount || '0');
                     const maxWithdrawAmount = selectedWithdrawalRule?.maxWithdrawAmount ? BigInt(selectedWithdrawalRule.maxWithdrawAmount) : undefined;
+                    const kycMaxWithdrawAmount = selectedKycLimit?.maxWithdrawAmount ? BigInt(selectedKycLimit.maxWithdrawAmount) : undefined;
                     if (amount <= 0n) {
                       return Promise.reject(new Error('提现数量必须大于 0'));
+                    }
+                    if (selectedKycLimit && !selectedKycLimit.withdrawEnabled) {
+                      return Promise.reject(new Error(`当前用户 KYC L${user?.kycLevel ?? 0} 不允许提现`));
                     }
                     if (amount < minWithdrawAmount) {
                       return Promise.reject(new Error(`最小提现数量为 ${selectedWithdrawalRule?.displayMinWithdrawAmount} ${selectedBalance.symbol}`));
                     }
                     if (maxWithdrawAmount !== undefined && amount > maxWithdrawAmount) {
                       return Promise.reject(new Error(`单笔上限为 ${selectedWithdrawalRule?.displayMaxWithdrawAmount} ${selectedBalance.symbol}`));
+                    }
+                    if (kycMaxWithdrawAmount !== undefined && amount > kycMaxWithdrawAmount) {
+                      return Promise.reject(new Error(`KYC L${user?.kycLevel ?? 0} 单笔上限为 ${selectedKycLimit?.displayMaxWithdrawAmount} ${selectedBalance.symbol}`));
                     }
                     if (amount > available) {
                       return Promise.reject(new Error('提现数量超过可用余额'));
@@ -429,6 +441,15 @@ export function UserDetailPage() {
                   </Descriptions.Item>
                   <Descriptions.Item label="每日上限">
                     {selectedWithdrawalRule.displayDailyWithdrawLimit || '不限'} {selectedWithdrawalRule.displayDailyWithdrawLimit ? selectedBalance.symbol : ''}
+                  </Descriptions.Item>
+                  <Descriptions.Item label={`KYC L${user?.kycLevel ?? 0} 提现`}>
+                    {selectedKycLimit?.withdrawEnabled ? '允许' : '禁止'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="KYC 单笔上限">
+                    {selectedKycLimit?.displayMaxWithdrawAmount || '不限'} {selectedKycLimit?.displayMaxWithdrawAmount ? selectedBalance.symbol : ''}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="KYC 每日上限">
+                    {selectedKycLimit?.displayDailyWithdrawLimit || '不限'} {selectedKycLimit?.displayDailyWithdrawLimit ? selectedBalance.symbol : ''}
                   </Descriptions.Item>
                 </Descriptions>
               ) : null}
