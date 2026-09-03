@@ -1,6 +1,7 @@
 package com.cexwallet.api.asset;
 
 import com.cexwallet.api.asset.AssetDtos.ChainView;
+import com.cexwallet.api.asset.AssetDtos.PlatformWalletView;
 import com.cexwallet.api.asset.AssetDtos.TokenView;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
@@ -77,6 +78,64 @@ public class AssetRepository {
         return updated == 1;
     }
 
+    public List<PlatformWalletView> findPlatformWallets() {
+        return jdbcTemplate.query("""
+                SELECT pw.id, pw.chain_id, c.name AS chain_name, pw.token_id, t.symbol AS token_symbol,
+                  pw.address, pw.wallet_role, pw.status, pw.remark
+                FROM platform_wallets pw
+                JOIN chains c ON c.id = pw.chain_id
+                LEFT JOIN tokens t ON t.id = pw.token_id
+                ORDER BY pw.id DESC
+                """, this::mapPlatformWallet);
+    }
+
+    public PlatformWalletView createPlatformWallet(AssetDtos.CreatePlatformWalletRequest request) {
+        Long id = jdbcTemplate.queryForObject("""
+                INSERT INTO platform_wallets (chain_id, token_id, address, wallet_role, status, remark)
+                VALUES (?, ?, ?, ?, ?, ?)
+                RETURNING id
+                """, Long.class, request.chainId(), request.tokenId(), request.address(), request.walletRole(), request.status(), request.remark());
+        return findPlatformWallet(id);
+    }
+
+    public boolean tokenBelongsToChain(Long chainId, Long tokenId) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM tokens
+                WHERE id = ? AND chain_id = ?
+                """, Integer.class, tokenId, chainId);
+        return count != null && count > 0;
+    }
+
+    public boolean updatePlatformWallet(Long id, AssetDtos.UpdatePlatformWalletRequest request) {
+        int updated = jdbcTemplate.update("""
+                UPDATE platform_wallets
+                SET address = ?, wallet_role = ?, status = ?, remark = ?, updated_at = NOW()
+                WHERE id = ?
+                """, request.address(), request.walletRole(), request.status(), request.remark(), id);
+        return updated == 1;
+    }
+
+    public boolean disablePlatformWallet(Long id) {
+        int updated = jdbcTemplate.update("""
+                UPDATE platform_wallets
+                SET status = 'INACTIVE', updated_at = NOW()
+                WHERE id = ?
+                """, id);
+        return updated == 1;
+    }
+
+    private PlatformWalletView findPlatformWallet(Long id) {
+        return jdbcTemplate.queryForObject("""
+                SELECT pw.id, pw.chain_id, c.name AS chain_name, pw.token_id, t.symbol AS token_symbol,
+                  pw.address, pw.wallet_role, pw.status, pw.remark
+                FROM platform_wallets pw
+                JOIN chains c ON c.id = pw.chain_id
+                LEFT JOIN tokens t ON t.id = pw.token_id
+                WHERE pw.id = ?
+                """, this::mapPlatformWallet, id);
+    }
+
     private ChainView mapChain(ResultSet rs, int rowNum) throws SQLException {
         return new ChainView(
                 rs.getLong("id"),
@@ -116,6 +175,20 @@ public class AssetRepository {
                 rs.getBoolean("deposit_enabled"),
                 rs.getBoolean("withdraw_enabled"),
                 rs.getString("status")
+        );
+    }
+
+    private PlatformWalletView mapPlatformWallet(ResultSet rs, int rowNum) throws SQLException {
+        return new PlatformWalletView(
+                rs.getLong("id"),
+                rs.getLong("chain_id"),
+                rs.getString("chain_name"),
+                rs.getObject("token_id", Long.class),
+                rs.getString("token_symbol"),
+                rs.getString("address"),
+                rs.getString("wallet_role"),
+                rs.getString("status"),
+                rs.getString("remark")
         );
     }
 

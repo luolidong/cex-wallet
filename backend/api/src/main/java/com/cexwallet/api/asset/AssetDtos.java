@@ -65,4 +65,35 @@ public class AssetDtos {
             @NotBlank String status
     ) {
     }
+
+    public record PlatformWalletView(
+            Long id,
+            Long chainId,
+            String chainName,
+            Long tokenId,
+            String tokenSymbol,
+            String address,
+            String walletRole,
+            String status,
+            String remark
+    ) {
+    }
+
+    public record CreatePlatformWalletRequest(
+            @NotNull Long chainId,
+            Long tokenId,
+            @NotBlank String address,
+            @NotBlank String walletRole,
+            @NotBlank String status,
+            String remark
+    ) {
+    }
+
+    public record UpdatePlatformWalletRequest(
+            @NotBlank String address,
+            @NotBlank String walletRole,
+            @NotBlank String status,
+            String remark
+    ) {
+    }
 }

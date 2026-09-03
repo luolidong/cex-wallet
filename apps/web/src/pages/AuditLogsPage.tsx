@@ -104,6 +104,9 @@ function actionLabel(action: string) {
     BLACKLIST_ADDRESS_ADD: '添加黑名单地址',
     BLACKLIST_ADDRESS_DISABLE: '停用黑名单地址',
     BLACKLIST_ADDRESS_ENABLE: '启用黑名单地址',
+    PLATFORM_WALLET_CREATE: '新增平台钱包',
+    PLATFORM_WALLET_UPDATE: '修改平台钱包',
+    PLATFORM_WALLET_DISABLE: '停用平台钱包',
     WITHDRAWAL_APPROVE: '批准提现',
     WITHDRAWAL_REJECT: '拒绝提现',
     WITHDRAWAL_BROADCAST: '广播提现',
@@ -116,6 +119,7 @@ function targetTypeLabel(targetType: string) {
   const labels: Record<string, string> = {
     CHAIN: '链',
     TOKEN: 'Token',
+    PLATFORM_WALLET: '平台钱包',
     WITHDRAWAL: '提现单',
     WITHDRAWAL_ADDRESS: '提现地址'
   };

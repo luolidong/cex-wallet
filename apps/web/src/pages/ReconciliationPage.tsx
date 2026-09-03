@@ -24,6 +24,7 @@ export function ReconciliationPage() {
     { title: '确认提现', dataIndex: 'displayConfirmedWithdrawals', width: 130 },
     { title: '待完成提现', dataIndex: 'displayPendingWithdrawals', width: 140 },
     { title: '期望账本', dataIndex: 'displayExpectedLedgerTotal', width: 130 },
+    { title: '热钱包地址', dataIndex: 'hotWalletAddress', width: 180, ellipsis: true, render: (value) => value || '未配置' },
     { title: '热钱包链上余额', dataIndex: 'displayHotWalletBalance', width: 160, render: (value) => value || '未配置' },
     {
       title: '资金覆盖差额',

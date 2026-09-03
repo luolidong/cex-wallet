@@ -34,6 +34,18 @@ export interface TokenAsset {
   status: string;
 }
 
+export interface PlatformWallet {
+  id: number;
+  chainId: number;
+  chainName: string;
+  tokenId?: number;
+  tokenSymbol?: string;
+  address: string;
+  walletRole: string;
+  status: string;
+  remark?: string;
+}
+
 export interface UpdateChainInput {
   name: string;
   rpcUrl: string;
@@ -55,6 +67,22 @@ export interface UpdateTokenInput {
   status: string;
 }
 
+export interface CreatePlatformWalletInput {
+  chainId: number;
+  tokenId?: number;
+  address: string;
+  walletRole: string;
+  status: string;
+  remark?: string;
+}
+
+export interface UpdatePlatformWalletInput {
+  address: string;
+  walletRole: string;
+  status: string;
+  remark?: string;
+}
+
 export async function listChains(): Promise<ChainAsset[]> {
   const response = await http.get<{ success: boolean; data: ChainAsset[] }>('/assets/chains');
   return response.data.data;
@@ -72,5 +100,25 @@ export async function listTokens(): Promise<TokenAsset[]> {
 
 export async function updateToken(id: number, input: UpdateTokenInput): Promise<TokenAsset[]> {
   const response = await http.put<{ success: boolean; data: TokenAsset[] }>(`/assets/tokens/${id}`, input);
+  return response.data.data;
+}
+
+export async function listPlatformWallets(): Promise<PlatformWallet[]> {
+  const response = await http.get<{ success: boolean; data: PlatformWallet[] }>('/assets/platform-wallets');
+  return response.data.data;
+}
+
+export async function createPlatformWallet(input: CreatePlatformWalletInput): Promise<PlatformWallet> {
+  const response = await http.post<{ success: boolean; data: PlatformWallet }>('/assets/platform-wallets', input);
+  return response.data.data;
+}
+
+export async function updatePlatformWallet(id: number, input: UpdatePlatformWalletInput): Promise<PlatformWallet[]> {
+  const response = await http.put<{ success: boolean; data: PlatformWallet[] }>(`/assets/platform-wallets/${id}`, input);
+  return response.data.data;
+}
+
+export async function disablePlatformWallet(id: number): Promise<PlatformWallet[]> {
+  const response = await http.delete<{ success: boolean; data: PlatformWallet[] }>(`/assets/platform-wallets/${id}`);
   return response.data.data;
 }

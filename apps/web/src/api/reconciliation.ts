@@ -23,6 +23,7 @@ export interface TokenReconciliation {
   displayExpectedLedgerTotal: string;
   difference: string;
   displayDifference: string;
+  hotWalletAddress?: string;
   hotWalletBalance?: string;
   displayHotWalletBalance: string;
   coverageDifference?: string;

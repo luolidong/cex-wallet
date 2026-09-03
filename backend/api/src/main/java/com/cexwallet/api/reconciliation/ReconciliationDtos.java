@@ -26,6 +26,7 @@ public class ReconciliationDtos {
             String displayExpectedLedgerTotal,
             BigDecimal difference,
             String displayDifference,
+            String hotWalletAddress,
             BigDecimal hotWalletBalance,
             String displayHotWalletBalance,
             BigDecimal coverageDifference,

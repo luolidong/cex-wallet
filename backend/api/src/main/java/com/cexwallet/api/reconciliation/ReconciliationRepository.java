@@ -73,6 +73,19 @@ public class ReconciliationRepository {
                 """, this::mapTokenReconciliation);
     }
 
+    public String findHotWalletAddress(Long tokenId) {
+        List<String> addresses = jdbcTemplate.queryForList("""
+                SELECT address
+                FROM platform_wallets
+                WHERE wallet_role = 'HOT'
+                  AND status = 'ACTIVE'
+                  AND (token_id = ? OR (token_id IS NULL AND chain_id = (SELECT chain_id FROM tokens WHERE id = ?)))
+                ORDER BY CASE WHEN token_id = ? THEN 0 ELSE 1 END, id DESC
+                LIMIT 1
+                """, String.class, tokenId, tokenId, tokenId);
+        return addresses.isEmpty() ? null : addresses.getFirst();
+    }
+
     private TokenReconciliationView mapTokenReconciliation(ResultSet rs, int rowNum) throws SQLException {
         int decimals = rs.getInt("decimals");
         BigDecimal userAvailable = rs.getBigDecimal("user_available");
@@ -106,6 +119,7 @@ public class ReconciliationRepository {
                 display(expectedLedgerTotal, decimals),
                 difference,
                 display(difference, decimals),
+                null,
                 null,
                 "",
                 null,

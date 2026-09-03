@@ -1,10 +1,19 @@
-import { EditOutlined, ReloadOutlined } from '@ant-design/icons';
+import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Form, Input, InputNumber, Modal, Select, Space, Switch, Table, Tabs, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useState } from 'react';
-import { listChains, listTokens, updateChain, updateToken } from '../api/assets';
-import type { ChainAsset, TokenAsset } from '../api/assets';
+import {
+  createPlatformWallet,
+  disablePlatformWallet,
+  listChains,
+  listPlatformWallets,
+  listTokens,
+  updateChain,
+  updatePlatformWallet,
+  updateToken
+} from '../api/assets';
+import type { ChainAsset, PlatformWallet, TokenAsset } from '../api/assets';
 
 interface ChainFormValues {
   name: string;
@@ -27,11 +36,24 @@ interface TokenFormValues {
   status: string;
 }
 
+interface PlatformWalletFormValues {
+  chainId: number;
+  tokenId?: number;
+  address: string;
+  walletRole: string;
+  status: string;
+  remark?: string;
+}
+
 export function AssetManagementPage() {
   const [editingChain, setEditingChain] = useState<ChainAsset>();
   const [editingToken, setEditingToken] = useState<TokenAsset>();
+  const [editingWallet, setEditingWallet] = useState<PlatformWallet>();
+  const [walletOpen, setWalletOpen] = useState(false);
   const [chainForm] = Form.useForm<ChainFormValues>();
   const [tokenForm] = Form.useForm<TokenFormValues>();
+  const [walletForm] = Form.useForm<PlatformWalletFormValues>();
+  const selectedWalletChainId = Form.useWatch('chainId', walletForm);
   const queryClient = useQueryClient();
 
   const chainsQuery = useQuery({
@@ -41,6 +63,10 @@ export function AssetManagementPage() {
   const tokensQuery = useQuery({
     queryKey: ['assets', 'tokens'],
     queryFn: listTokens
+  });
+  const platformWalletsQuery = useQuery({
+    queryKey: ['assets', 'platform-wallets'],
+    queryFn: listPlatformWallets
   });
 
   const updateChainMutation = useMutation({
@@ -80,6 +106,42 @@ export function AssetManagementPage() {
       await queryClient.invalidateQueries({ queryKey: ['risk', 'withdrawal-rules'] });
     },
     onError: (error) => showRequestError(error, '保存 Token 配置失败')
+  });
+
+  const createWalletMutation = useMutation({
+    mutationFn: (values: PlatformWalletFormValues) => createPlatformWallet(toCreateWalletInput(values)),
+    onSuccess: async () => {
+      message.success('平台钱包已新增');
+      closeWalletModal();
+      await queryClient.invalidateQueries({ queryKey: ['assets', 'platform-wallets'] });
+      await queryClient.invalidateQueries({ queryKey: ['reconciliation', 'tokens'] });
+      await queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
+    },
+    onError: (error) => showRequestError(error, '新增平台钱包失败')
+  });
+
+  const updateWalletMutation = useMutation({
+    mutationFn: ({ id, values }: { id: number; values: PlatformWalletFormValues }) =>
+      updatePlatformWallet(id, toUpdateWalletInput(values)),
+    onSuccess: async () => {
+      message.success('平台钱包已保存');
+      closeWalletModal();
+      await queryClient.invalidateQueries({ queryKey: ['assets', 'platform-wallets'] });
+      await queryClient.invalidateQueries({ queryKey: ['reconciliation', 'tokens'] });
+      await queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
+    },
+    onError: (error) => showRequestError(error, '保存平台钱包失败')
+  });
+
+  const disableWalletMutation = useMutation({
+    mutationFn: disablePlatformWallet,
+    onSuccess: async () => {
+      message.success('平台钱包已停用');
+      await queryClient.invalidateQueries({ queryKey: ['assets', 'platform-wallets'] });
+      await queryClient.invalidateQueries({ queryKey: ['reconciliation', 'tokens'] });
+      await queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
+    },
+    onError: (error) => showRequestError(error, '停用平台钱包失败')
   });
 
   const chainColumns: ColumnsType<ChainAsset> = [
@@ -156,6 +218,48 @@ export function AssetManagementPage() {
     }
   ];
 
+  const walletColumns: ColumnsType<PlatformWallet> = [
+    { title: 'ID', dataIndex: 'id', width: 80 },
+    { title: '链', dataIndex: 'chainName', width: 140 },
+    { title: 'Token', dataIndex: 'tokenSymbol', width: 120, render: (value) => value || '链级钱包' },
+    {
+      title: '角色',
+      dataIndex: 'walletRole',
+      width: 120,
+      render: (value) => <Tag color={value === 'HOT' ? 'orange' : 'blue'}>{walletRoleLabel(value)}</Tag>
+    },
+    { title: '地址', dataIndex: 'address', ellipsis: true },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      width: 110,
+      render: (value) => <Tag color={value === 'ACTIVE' ? 'green' : 'default'}>{value}</Tag>
+    },
+    { title: '备注', dataIndex: 'remark', ellipsis: true, render: (value) => value || '-' },
+    {
+      title: '操作',
+      width: 170,
+      fixed: 'right',
+      render: (_, record) => (
+        <Space>
+          <Button size="small" icon={<EditOutlined />} onClick={() => openWalletModal(record)}>
+            编辑
+          </Button>
+          <Button
+            danger
+            size="small"
+            icon={<DeleteOutlined />}
+            disabled={record.status !== 'ACTIVE'}
+            loading={disableWalletMutation.isPending}
+            onClick={() => disableWalletMutation.mutate(record.id)}
+          >
+            停用
+          </Button>
+        </Space>
+      )
+    }
+  ];
+
   function openChainModal(chain: ChainAsset) {
     setEditingChain(chain);
     chainForm.setFieldsValue({
@@ -183,6 +287,36 @@ export function AssetManagementPage() {
     });
   }
 
+  function openWalletModal(wallet?: PlatformWallet) {
+    setEditingWallet(wallet);
+    setWalletOpen(true);
+    walletForm.setFieldsValue(
+      wallet
+        ? {
+            chainId: wallet.chainId,
+            tokenId: wallet.tokenId,
+            address: wallet.address,
+            walletRole: wallet.walletRole,
+            status: wallet.status,
+            remark: wallet.remark
+          }
+        : {
+            chainId: chainsQuery.data?.[0]?.id,
+            tokenId: undefined,
+            address: '',
+            walletRole: 'HOT',
+            status: 'ACTIVE',
+            remark: ''
+          }
+    );
+  }
+
+  function closeWalletModal() {
+    setEditingWallet(undefined);
+    setWalletOpen(false);
+    walletForm.resetFields();
+  }
+
   async function handleSaveChain() {
     if (!editingChain) {
       return;
@@ -199,6 +333,19 @@ export function AssetManagementPage() {
     updateTokenMutation.mutate({ id: editingToken.id, values });
   }
 
+  async function handleSaveWallet() {
+    const values = await walletForm.validateFields();
+    if (editingWallet) {
+      updateWalletMutation.mutate({ id: editingWallet.id, values });
+      return;
+    }
+    createWalletMutation.mutate(values);
+  }
+
+  const walletTokenOptions = (tokensQuery.data || [])
+    .filter((token) => !selectedWalletChainId || token.chainId === selectedWalletChainId)
+    .map((token) => ({ value: token.id, label: `${token.symbol} / ${token.chainName}` }));
+
   return (
     <>
       <div className="page-toolbar">
@@ -211,6 +358,7 @@ export function AssetManagementPage() {
           onClick={() => {
             chainsQuery.refetch();
             tokensQuery.refetch();
+            platformWalletsQuery.refetch();
           }}
         >
           刷新
@@ -244,6 +392,28 @@ export function AssetManagementPage() {
                 pagination={false}
                 scroll={{ x: 1300 }}
               />
+            )
+          },
+          {
+            key: 'platform-wallets',
+            label: '平台钱包',
+            children: (
+              <Space direction="vertical" className="full-width" size={16}>
+                <div className="table-toolbar">
+                  <Typography.Text type="secondary">配置平台热钱包、冷钱包和归集钱包。账务对账会优先读取 ACTIVE 的 HOT 钱包。</Typography.Text>
+                  <Button type="primary" icon={<PlusOutlined />} onClick={() => openWalletModal()}>
+                    新增钱包
+                  </Button>
+                </div>
+                <Table
+                  rowKey="id"
+                  columns={walletColumns}
+                  dataSource={platformWalletsQuery.data || []}
+                  loading={platformWalletsQuery.isLoading}
+                  pagination={false}
+                  scroll={{ x: 1200 }}
+                />
+              </Space>
             )
           }
         ]}
@@ -331,8 +501,88 @@ export function AssetManagementPage() {
           </Form.Item>
         </Form>
       </Modal>
+
+      <Modal
+        title={editingWallet ? `编辑平台钱包 #${editingWallet.id}` : '新增平台钱包'}
+        open={walletOpen}
+        okText="保存"
+        confirmLoading={createWalletMutation.isPending || updateWalletMutation.isPending}
+        onOk={handleSaveWallet}
+        onCancel={closeWalletModal}
+      >
+        <Form form={walletForm} layout="vertical">
+          <Form.Item label="链" name="chainId" rules={[{ required: true, message: '请选择链' }]}>
+            <Select
+              disabled={Boolean(editingWallet)}
+              options={(chainsQuery.data || []).map((chain) => ({ value: chain.id, label: `${chain.name} / ${chain.chainId}` }))}
+            />
+          </Form.Item>
+          <Form.Item label="Token" name="tokenId">
+            <Select
+              allowClear
+              disabled={Boolean(editingWallet)}
+              placeholder="不选表示链级钱包"
+              options={walletTokenOptions}
+            />
+          </Form.Item>
+          <Form.Item label="钱包角色" name="walletRole" rules={[{ required: true, message: '请选择钱包角色' }]}>
+            <Select
+              options={[
+                { value: 'HOT', label: 'HOT / 热钱包' },
+                { value: 'COLD', label: 'COLD / 冷钱包' },
+                { value: 'COLLECTION', label: 'COLLECTION / 归集钱包' },
+                { value: 'FEE', label: 'FEE / 手续费钱包' }
+              ]}
+            />
+          </Form.Item>
+          <Form.Item label="钱包地址" name="address" rules={[{ required: true, message: '请输入钱包地址' }]}>
+            <Input placeholder="例如 0x..." />
+          </Form.Item>
+          <Form.Item label="状态" name="status" rules={[{ required: true, message: '请选择状态' }]}>
+            <Select
+              options={[
+                { value: 'ACTIVE', label: 'ACTIVE' },
+                { value: 'INACTIVE', label: 'INACTIVE' }
+              ]}
+            />
+          </Form.Item>
+          <Form.Item label="备注" name="remark">
+            <Input.TextArea rows={3} placeholder="例如 Anvil 开发热钱包" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </>
   );
+}
+
+function toCreateWalletInput(values: PlatformWalletFormValues) {
+  return {
+    chainId: values.chainId,
+    tokenId: values.tokenId || undefined,
+    address: values.address.trim(),
+    walletRole: values.walletRole,
+    status: values.status,
+    remark: values.remark?.trim()
+  };
+}
+
+function toUpdateWalletInput(values: PlatformWalletFormValues) {
+  return {
+    address: values.address.trim(),
+    walletRole: values.walletRole,
+    status: values.status,
+    remark: values.remark?.trim()
+  };
+}
+
+function walletRoleLabel(role: string) {
+  const labels: Record<string, string> = {
+    HOT: '热钱包',
+    COLD: '冷钱包',
+    COLLECTION: '归集钱包',
+    FEE: '手续费钱包'
+  };
+  return labels[role] || role;
 }
 
 function toBaseUnit(value: string, decimals: number): string {

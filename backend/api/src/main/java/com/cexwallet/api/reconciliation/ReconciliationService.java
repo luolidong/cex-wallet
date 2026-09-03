@@ -3,23 +3,19 @@ package com.cexwallet.api.reconciliation;
 import com.cexwallet.api.reconciliation.ReconciliationDtos.TokenReconciliationView;
 import java.math.BigDecimal;
 import java.util.List;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
 public class ReconciliationService {
     private final ReconciliationRepository reconciliationRepository;
     private final EvmRpcClient evmRpcClient;
-    private final String hotWalletAddress;
 
     public ReconciliationService(
             ReconciliationRepository reconciliationRepository,
-            EvmRpcClient evmRpcClient,
-            @Value("${app.evm.hot-wallet-address}") String hotWalletAddress
+            EvmRpcClient evmRpcClient
     ) {
         this.reconciliationRepository = reconciliationRepository;
         this.evmRpcClient = evmRpcClient;
-        this.hotWalletAddress = hotWalletAddress;
     }
 
     public List<TokenReconciliationView> findTokenReconciliations() {
@@ -29,6 +25,7 @@ public class ReconciliationService {
     }
 
     private TokenReconciliationView withHotWalletBalance(TokenReconciliationView view) {
+        String hotWalletAddress = reconciliationRepository.findHotWalletAddress(view.tokenId());
         if (hotWalletAddress == null || hotWalletAddress.isBlank()) {
             return view;
         }
@@ -60,6 +57,7 @@ public class ReconciliationService {
                     view.displayExpectedLedgerTotal(),
                     view.difference(),
                     view.displayDifference(),
+                    hotWalletAddress,
                     hotWalletBalance,
                     display(hotWalletBalance, view.decimals()),
                     coverageDifference,
