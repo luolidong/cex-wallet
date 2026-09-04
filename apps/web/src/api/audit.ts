@@ -1,4 +1,5 @@
 import { http } from './http';
+import type { PageResult } from './wallets';
 
 export interface AuditLog {
   id: number;
@@ -12,9 +13,15 @@ export interface AuditLog {
   createdAt: string;
 }
 
-export async function listAuditLogs(limit = 100): Promise<AuditLog[]> {
-  const response = await http.get<{ success: boolean; data: AuditLog[] }>('/audit-logs', {
-    params: { limit }
-  });
+export interface ListAuditLogsParams {
+  keyword?: string;
+  action?: string;
+  targetType?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export async function listAuditLogs(params: ListAuditLogsParams): Promise<PageResult<AuditLog>> {
+  const response = await http.get<{ success: boolean; data: PageResult<AuditLog> }>('/audit-logs', { params });
   return response.data.data;
 }

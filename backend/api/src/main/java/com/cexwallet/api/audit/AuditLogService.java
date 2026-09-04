@@ -2,6 +2,7 @@ package com.cexwallet.api.audit;
 
 import com.cexwallet.api.audit.AuditDtos.AuditLogView;
 import com.cexwallet.api.auth.AdminUser;
+import com.cexwallet.api.common.PageResponse;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
@@ -30,9 +31,13 @@ public class AuditLogService {
         );
     }
 
-    public List<AuditLogView> findLatest(int limit) {
-        int normalizedLimit = Math.max(1, Math.min(limit, 200));
-        return auditLogRepository.findLatest(normalizedLimit);
+    public PageResponse<AuditLogView> findLogs(String keyword, String action, String targetType, int page, int pageSize) {
+        int normalizedPage = Math.max(page, 1);
+        int normalizedPageSize = Math.min(Math.max(pageSize, 1), 100);
+        int offset = (normalizedPage - 1) * normalizedPageSize;
+        List<AuditLogView> items = auditLogRepository.findLogs(keyword, action, targetType, normalizedPageSize, offset);
+        long total = auditLogRepository.countLogs(keyword, action, targetType);
+        return new PageResponse<>(items, normalizedPage, normalizedPageSize, total);
     }
 
     private String toJson(Object detail) {

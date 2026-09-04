@@ -1,16 +1,24 @@
 import { EyeOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Descriptions, Drawer, Empty, Space, Table, Tag, Typography } from 'antd';
+import { Button, Descriptions, Drawer, Empty, Form, Input, Select, Space, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useState } from 'react';
 import { listAuditLogs } from '../api/audit';
-import type { AuditLog } from '../api/audit';
+import type { AuditLog, ListAuditLogsParams } from '../api/audit';
+
+interface FilterValues {
+  keyword?: string;
+  action?: string;
+  targetType?: string;
+}
 
 export function AuditLogsPage() {
+  const [filters, setFilters] = useState<ListAuditLogsParams>({ page: 1, pageSize: 20 });
   const [selectedLog, setSelectedLog] = useState<AuditLog>();
+  const [form] = Form.useForm<FilterValues>();
   const logsQuery = useQuery({
-    queryKey: ['audit-logs'],
-    queryFn: () => listAuditLogs(100),
+    queryKey: ['audit-logs', filters],
+    queryFn: () => listAuditLogs(filters),
     refetchInterval: 10000
   });
 
@@ -43,6 +51,21 @@ export function AuditLogsPage() {
     }
   ];
 
+  function handleSearch(values: FilterValues) {
+    setFilters({
+      keyword: values.keyword?.trim() || undefined,
+      action: values.action,
+      targetType: values.targetType,
+      page: 1,
+      pageSize: filters.pageSize
+    });
+  }
+
+  function handleReset() {
+    form.resetFields();
+    setFilters({ page: 1, pageSize: filters.pageSize });
+  }
+
   return (
     <>
       <div className="page-toolbar">
@@ -58,14 +81,44 @@ export function AuditLogsPage() {
         </Space>
       </div>
 
-      <Table
-        rowKey="id"
-        columns={columns}
-        dataSource={logsQuery.data || []}
-        loading={logsQuery.isLoading}
-        pagination={{ pageSize: 20 }}
-        locale={{ emptyText: <Empty description="暂无审计日志" /> }}
-      />
+      <Space direction="vertical" className="full-width" size={16}>
+        <Form form={form} layout="inline" onFinish={handleSearch}>
+          <Form.Item name="keyword">
+            <Input allowClear placeholder="管理员 / 对象 ID / 摘要 / 详情" />
+          </Form.Item>
+          <Form.Item name="action">
+            <Select allowClear className="filter-select-wide" placeholder="动作" options={auditActionOptions()} />
+          </Form.Item>
+          <Form.Item name="targetType">
+            <Select allowClear className="filter-select" placeholder="对象类型" options={targetTypeOptions()} />
+          </Form.Item>
+          <Form.Item>
+            <Space>
+              <Button type="primary" htmlType="submit">
+                查询
+              </Button>
+              <Button onClick={handleReset}>重置</Button>
+            </Space>
+          </Form.Item>
+        </Form>
+
+        <Table
+          rowKey="id"
+          columns={columns}
+          dataSource={logsQuery.data?.items || []}
+          loading={logsQuery.isLoading}
+          pagination={{
+            current: logsQuery.data?.page || filters.page || 1,
+            pageSize: logsQuery.data?.pageSize || filters.pageSize || 20,
+            total: logsQuery.data?.total || 0,
+            showSizeChanger: true,
+            showTotal: (total) => `共 ${total} 条日志`,
+            onChange: (page, pageSize) => setFilters((current) => ({ ...current, page, pageSize }))
+          }}
+          locale={{ emptyText: <Empty description="暂无审计日志" /> }}
+          scroll={{ x: 1300 }}
+        />
+      </Space>
 
       <Drawer
         title="审计详情"
@@ -126,6 +179,35 @@ function actionLabel(action: string) {
   return labels[action] || action;
 }
 
+function auditActionOptions() {
+  return [
+    'CHAIN_UPDATE',
+    'TOKEN_UPDATE',
+    'WITHDRAWAL_RULE_UPDATE',
+    'BLACKLIST_ADDRESS_ADD',
+    'BLACKLIST_ADDRESS_DISABLE',
+    'BLACKLIST_ADDRESS_ENABLE',
+    'KYC_WITHDRAWAL_LIMIT_UPDATE',
+    'PLATFORM_WALLET_CREATE',
+    'PLATFORM_WALLET_UPDATE',
+    'PLATFORM_WALLET_DISABLE',
+    'USER_STATUS_UPDATE',
+    'USER_KYC_UPDATE',
+    'LEDGER_MANUAL_ADJUSTMENT',
+    'ADMIN_ACCOUNT_CREATE',
+    'ADMIN_ACCOUNT_STATUS_UPDATE',
+    'ADMIN_ACCOUNT_ROLES_UPDATE',
+    'ROLE_PERMISSIONS_UPDATE',
+    'WALLET_ENABLE',
+    'WALLET_DISABLE',
+    'WITHDRAWAL_APPROVE',
+    'WITHDRAWAL_REJECT',
+    'WITHDRAWAL_FAIL',
+    'WITHDRAWAL_BROADCAST',
+    'WITHDRAWAL_CONFIRM'
+  ].map((action) => ({ value: action, label: actionLabel(action) }));
+}
+
 function targetTypeLabel(targetType: string) {
   const labels: Record<string, string> = {
     CHAIN: '链',
@@ -141,6 +223,22 @@ function targetTypeLabel(targetType: string) {
     WITHDRAWAL_ADDRESS: '提现地址'
   };
   return labels[targetType] || targetType;
+}
+
+function targetTypeOptions() {
+  return [
+    'CHAIN',
+    'TOKEN',
+    'PLATFORM_WALLET',
+    'ADMIN_USER',
+    'ROLE',
+    'USER',
+    'KYC_WITHDRAWAL_LIMIT',
+    'LEDGER_JOURNAL',
+    'WALLET',
+    'WITHDRAWAL',
+    'WITHDRAWAL_ADDRESS'
+  ].map((targetType) => ({ value: targetType, label: targetTypeLabel(targetType) }));
 }
 
 function formatDetail(detailJson?: string) {
