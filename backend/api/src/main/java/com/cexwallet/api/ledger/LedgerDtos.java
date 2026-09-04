@@ -43,4 +43,14 @@ public class LedgerDtos {
             Instant createdAt
     ) {
     }
+
+    public record ManualAdjustmentRequest(
+            @NotNull Long userId,
+            @NotNull Long tokenId,
+            @NotBlank String direction,
+            @NotNull @Positive BigDecimal amount,
+            @NotBlank String reason,
+            String idempotencyKey
+    ) {
+    }
 }

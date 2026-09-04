@@ -110,6 +110,7 @@ function actionLabel(action: string) {
     PLATFORM_WALLET_DISABLE: '停用平台钱包',
     USER_STATUS_UPDATE: '修改用户状态',
     USER_KYC_UPDATE: '修改用户 KYC',
+    LEDGER_MANUAL_ADJUSTMENT: '人工调账',
     ADMIN_ACCOUNT_CREATE: '新增后台账号',
     ADMIN_ACCOUNT_STATUS_UPDATE: '修改后台账号状态',
     ADMIN_ACCOUNT_ROLES_UPDATE: '修改后台账号角色',
@@ -134,6 +135,7 @@ function targetTypeLabel(targetType: string) {
     ROLE: '角色',
     USER: '用户',
     KYC_WITHDRAWAL_LIMIT: 'KYC 提现限额',
+    LEDGER_JOURNAL: '账务流水',
     WALLET: '充值地址',
     WITHDRAWAL: '提现单',
     WITHDRAWAL_ADDRESS: '提现地址'

@@ -28,6 +28,15 @@ export interface LedgerEntry {
   createdAt: string;
 }
 
+export interface ManualAdjustmentInput {
+  userId: number;
+  tokenId: number;
+  direction: string;
+  amount: string;
+  reason: string;
+  idempotencyKey?: string;
+}
+
 export interface ListLedgerJournalsParams {
   keyword?: string;
   businessType?: string;
@@ -43,5 +52,10 @@ export async function listLedgerJournals(params: ListLedgerJournalsParams): Prom
 
 export async function listLedgerEntries(journalId: number): Promise<LedgerEntry[]> {
   const response = await http.get<{ success: boolean; data: LedgerEntry[] }>(`/ledger/journals/${journalId}/entries`);
+  return response.data.data;
+}
+
+export async function createManualAdjustment(input: ManualAdjustmentInput): Promise<LedgerJournal> {
+  const response = await http.post<{ success: boolean; data: LedgerJournal }>('/ledger/adjustments', input);
   return response.data.data;
 }

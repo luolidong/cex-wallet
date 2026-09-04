@@ -47,6 +47,7 @@
 7. 拒绝提现后筛选 `WITHDRAWAL_REJECT`，预期冻结账户 `DEBIT`，可用账户 `CREDIT`。
 8. 确认提现后筛选 `WITHDRAWAL_SETTLE`，预期冻结账户 `DEBIT`。
 9. 已批准或已广播提现执行失败退款后筛选 `WITHDRAWAL_FAIL_REFUND`，预期冻结账户 `DEBIT`，可用账户 `CREDIT`。
+10. 人工调账后筛选 `MANUAL_ADJUSTMENT`，预期可以看到用户可用账户和平台调账账户的成对分录。
 
 ## 5. 权限说明
 

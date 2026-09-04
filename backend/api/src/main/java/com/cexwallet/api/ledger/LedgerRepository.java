@@ -46,6 +46,19 @@ public class LedgerRepository {
                 """, Long.class, ownerType, ownerId, accountType, tokenId);
     }
 
+    public BigDecimal findAccountBalance(Long accountId) {
+        BigDecimal balance = jdbcTemplate.queryForObject("""
+                SELECT COALESCE(SUM(CASE
+                  WHEN direction = 'CREDIT' THEN amount
+                  WHEN direction = 'DEBIT' THEN -amount
+                  ELSE 0
+                END), 0)
+                FROM ledger_entries
+                WHERE account_id = ?
+                """, BigDecimal.class, accountId);
+        return balance == null ? BigDecimal.ZERO : balance;
+    }
+
     public Optional<Long> findJournalByIdempotencyKey(String idempotencyKey) {
         List<Long> journals = jdbcTemplate.queryForList(
                 "SELECT id FROM ledger_journals WHERE idempotency_key = ?",
@@ -126,6 +139,14 @@ public class LedgerRepository {
         query.args().add(limit);
         query.args().add(offset);
         return jdbcTemplate.query(query.sql().toString(), this::mapJournal, query.args().toArray());
+    }
+
+    public LedgerDtos.LedgerJournalView findJournalById(Long id) {
+        return jdbcTemplate.queryForObject("""
+                SELECT id, journal_no, business_type, business_id, idempotency_key, status, description, created_at
+                FROM ledger_journals
+                WHERE id = ?
+                """, this::mapJournal, id);
     }
 
     public long countJournals(String keyword, String businessType, String status) {

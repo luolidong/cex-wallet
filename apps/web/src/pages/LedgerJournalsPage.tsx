@@ -1,9 +1,10 @@
-import { EyeOutlined, ReloadOutlined } from '@ant-design/icons';
-import { useQuery } from '@tanstack/react-query';
-import { Button, Descriptions, Drawer, Form, Input, Select, Space, Table, Tag, Typography } from 'antd';
+import { EyeOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Button, Descriptions, Drawer, Form, Input, Modal, Select, Space, Table, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useState } from 'react';
-import { listLedgerEntries, listLedgerJournals } from '../api/ledger';
+import { listTokens } from '../api/assets';
+import { createManualAdjustment, listLedgerEntries, listLedgerJournals } from '../api/ledger';
 import type { LedgerEntry, LedgerJournal, ListLedgerJournalsParams } from '../api/ledger';
 
 interface FilterValues {
@@ -12,10 +13,23 @@ interface FilterValues {
   status?: string;
 }
 
+interface AdjustmentFormValues {
+  userId: number;
+  tokenId: number;
+  direction: string;
+  displayAmount: string;
+  reason: string;
+  idempotencyKey?: string;
+}
+
 export function LedgerJournalsPage() {
   const [filters, setFilters] = useState<ListLedgerJournalsParams>({ page: 1, pageSize: 20 });
   const [selectedJournal, setSelectedJournal] = useState<LedgerJournal>();
+  const [adjustmentOpen, setAdjustmentOpen] = useState(false);
   const [form] = Form.useForm<FilterValues>();
+  const [adjustmentForm] = Form.useForm<AdjustmentFormValues>();
+  const selectedTokenId = Form.useWatch('tokenId', adjustmentForm);
+  const queryClient = useQueryClient();
 
   const journalsQuery = useQuery({
     queryKey: ['ledger-journals', filters],
@@ -25,6 +39,35 @@ export function LedgerJournalsPage() {
     queryKey: ['ledger-entries', selectedJournal?.id],
     queryFn: () => listLedgerEntries(selectedJournal!.id),
     enabled: Boolean(selectedJournal)
+  });
+  const tokensQuery = useQuery({
+    queryKey: ['assets', 'tokens'],
+    queryFn: listTokens
+  });
+  const selectedToken = tokensQuery.data?.find((token) => token.id === selectedTokenId);
+
+  const adjustmentMutation = useMutation({
+    mutationFn: (values: AdjustmentFormValues) => {
+      const token = tokensQuery.data?.find((item) => item.id === values.tokenId);
+      if (!token) {
+        throw new Error('请选择 Token');
+      }
+      return createManualAdjustment({
+        userId: Number(values.userId),
+        tokenId: Number(values.tokenId),
+        direction: values.direction,
+        amount: toBaseUnit(values.displayAmount, token.decimals),
+        reason: values.reason,
+        idempotencyKey: values.idempotencyKey?.trim() || undefined
+      });
+    },
+    onSuccess: async () => {
+      message.success('人工调账已入账');
+      setAdjustmentOpen(false);
+      adjustmentForm.resetFields();
+      await queryClient.invalidateQueries({ queryKey: ['ledger-journals'] });
+    },
+    onError: (error) => showRequestError(error, '人工调账失败')
   });
 
   const journalColumns: ColumnsType<LedgerJournal> = [
@@ -92,9 +135,14 @@ export function LedgerJournalsPage() {
           <Typography.Title level={3}>账务流水</Typography.Title>
           <Typography.Text type="secondary">查询 Ledger 流水和借贷分录，用于排查余额和对账差异。</Typography.Text>
         </div>
-        <Button icon={<ReloadOutlined />} onClick={() => journalsQuery.refetch()}>
-          刷新
-        </Button>
+        <Space>
+          <Button icon={<ReloadOutlined />} onClick={() => journalsQuery.refetch()}>
+            刷新
+          </Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setAdjustmentOpen(true)}>
+            人工调账
+          </Button>
+        </Space>
       </div>
 
       <Space direction="vertical" className="full-width" size={16}>
@@ -112,7 +160,9 @@ export function LedgerJournalsPage() {
                 { value: 'MOCK_DEPOSIT', label: 'MOCK_DEPOSIT' },
                 { value: 'WITHDRAWAL_FREEZE', label: 'WITHDRAWAL_FREEZE' },
                 { value: 'WITHDRAWAL_REJECT', label: 'WITHDRAWAL_REJECT' },
-                { value: 'WITHDRAWAL_SETTLE', label: 'WITHDRAWAL_SETTLE' }
+                { value: 'WITHDRAWAL_FAIL_REFUND', label: 'WITHDRAWAL_FAIL_REFUND' },
+                { value: 'WITHDRAWAL_SETTLE', label: 'WITHDRAWAL_SETTLE' },
+                { value: 'MANUAL_ADJUSTMENT', label: 'MANUAL_ADJUSTMENT' }
               ]}
             />
           </Form.Item>
@@ -166,6 +216,66 @@ export function LedgerJournalsPage() {
           </Space>
         ) : null}
       </Drawer>
+
+      <Modal
+        title="人工调账"
+        open={adjustmentOpen}
+        okText="确认入账"
+        okButtonProps={{ danger: true }}
+        confirmLoading={adjustmentMutation.isPending}
+        onOk={() => adjustmentForm.validateFields().then((values) => adjustmentMutation.mutate(values))}
+        onCancel={() => setAdjustmentOpen(false)}
+      >
+        <Form form={adjustmentForm} layout="vertical" initialValues={{ direction: 'CREDIT' }}>
+          <Form.Item label="用户 ID" name="userId" rules={[{ required: true, message: '请输入用户 ID' }]}>
+            <Input placeholder="例如 1" />
+          </Form.Item>
+          <Form.Item label="Token" name="tokenId" rules={[{ required: true, message: '请选择 Token' }]}>
+            <Select
+              placeholder="选择调账资产"
+              loading={tokensQuery.isLoading}
+              options={(tokensQuery.data || []).map((token) => ({
+                value: token.id,
+                label: `${token.symbol} / ${token.chainName}`
+              }))}
+            />
+          </Form.Item>
+          <Form.Item label="方向" name="direction" rules={[{ required: true, message: '请选择方向' }]}>
+            <Select
+              options={[
+                { value: 'CREDIT', label: '增加用户可用余额' },
+                { value: 'DEBIT', label: '减少用户可用余额' }
+              ]}
+            />
+          </Form.Item>
+          <Form.Item label="数量" name="displayAmount" rules={[{ required: true, message: '请输入数量' }]}>
+            <Input placeholder="例如 0.1" suffix={selectedToken?.symbol} />
+          </Form.Item>
+          <Form.Item label="原因" name="reason" rules={[{ required: true, message: '请输入调账原因' }]}>
+            <Input.TextArea rows={3} placeholder="例如：客服补偿、异常订单修正、测试环境修正" />
+          </Form.Item>
+          <Form.Item label="幂等键" name="idempotencyKey">
+            <Input placeholder="可选；重复提交保护，例如 ticket-10001" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </>
   );
+}
+
+function toBaseUnit(value: string, decimals: number): string {
+  const normalized = value.trim();
+  if (!/^\d+(\.\d+)?$/.test(normalized)) {
+    throw new Error('amount format is invalid');
+  }
+  const [integerPart, decimalPart = ''] = normalized.split('.');
+  if (decimalPart.length > decimals) {
+    throw new Error('too many decimal places');
+  }
+  return `${integerPart}${decimalPart.padEnd(decimals, '0')}`.replace(/^0+(?=\d)/, '') || '0';
+}
+
+function showRequestError(error: unknown, fallback: string) {
+  const err = error as { response?: { data?: { error?: { message?: string; details?: string } } }; message?: string };
+  message.error(err.response?.data?.error?.details || err.response?.data?.error?.message || err.message || fallback);
 }
