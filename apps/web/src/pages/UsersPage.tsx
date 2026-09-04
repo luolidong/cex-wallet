@@ -4,19 +4,35 @@ import { Button, Form, Input, Modal, Select, Space, Table, Tag, Typography, mess
 import type { ColumnsType } from 'antd/es/table';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createUser, listUsers, updateUserKycLevel, updateUserStatus, type CreateUserInput, type User } from '../api/users';
+import {
+  createUser,
+  listUsers,
+  updateUserKycLevel,
+  updateUserStatus,
+  type CreateUserInput,
+  type ListUsersParams,
+  type User
+} from '../api/users';
+
+interface FilterValues {
+  keyword?: string;
+  status?: string;
+  kycLevel?: number;
+}
 
 export function UsersPage() {
+  const [filters, setFilters] = useState<ListUsersParams>({ page: 1, pageSize: 20 });
   const [createOpen, setCreateOpen] = useState(false);
   const [kycUser, setKycUser] = useState<User>();
+  const [filterForm] = Form.useForm<FilterValues>();
   const [form] = Form.useForm<CreateUserInput>();
   const [kycForm] = Form.useForm<{ kycLevel: number }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const usersQuery = useQuery({
-    queryKey: ['users'],
-    queryFn: listUsers
+    queryKey: ['users', filters],
+    queryFn: () => listUsers(filters)
   });
 
   const createMutation = useMutation({
@@ -130,6 +146,21 @@ export function UsersPage() {
     createMutation.mutate(values);
   }
 
+  function handleSearch(values: FilterValues) {
+    setFilters({
+      keyword: values.keyword?.trim() || undefined,
+      status: values.status,
+      kycLevel: values.kycLevel,
+      page: 1,
+      pageSize: filters.pageSize
+    });
+  }
+
+  function handleReset() {
+    filterForm.resetFields();
+    setFilters({ page: 1, pageSize: filters.pageSize });
+  }
+
   function confirmStatusChange(user: User, status: string) {
     const freeze = status === 'FROZEN';
     Modal.confirm({
@@ -173,13 +204,61 @@ export function UsersPage() {
         </Space>
       </div>
 
-      <Table
-        rowKey="id"
-        columns={columns}
-        dataSource={usersQuery.data || []}
-        loading={usersQuery.isLoading}
-        pagination={{ pageSize: 20 }}
-      />
+      <Space direction="vertical" className="full-width" size={16}>
+        <Form form={filterForm} layout="inline" onFinish={handleSearch}>
+          <Form.Item name="keyword">
+            <Input allowClear placeholder="用户 ID / 用户名 / 邮箱 / 手机" />
+          </Form.Item>
+          <Form.Item name="status">
+            <Select
+              allowClear
+              className="filter-select"
+              placeholder="状态"
+              options={[
+                { value: 'ACTIVE', label: 'ACTIVE' },
+                { value: 'FROZEN', label: 'FROZEN' }
+              ]}
+            />
+          </Form.Item>
+          <Form.Item name="kycLevel">
+            <Select
+              allowClear
+              className="filter-select"
+              placeholder="KYC"
+              options={[
+                { value: 0, label: 'L0' },
+                { value: 1, label: 'L1' },
+                { value: 2, label: 'L2' },
+                { value: 3, label: 'L3' }
+              ]}
+            />
+          </Form.Item>
+          <Form.Item>
+            <Space>
+              <Button type="primary" htmlType="submit">
+                查询
+              </Button>
+              <Button onClick={handleReset}>重置</Button>
+            </Space>
+          </Form.Item>
+        </Form>
+
+        <Table
+          rowKey="id"
+          columns={columns}
+          dataSource={usersQuery.data?.items || []}
+          loading={usersQuery.isLoading}
+          pagination={{
+            current: usersQuery.data?.page || filters.page || 1,
+            pageSize: usersQuery.data?.pageSize || filters.pageSize || 20,
+            total: usersQuery.data?.total || 0,
+            showSizeChanger: true,
+            showTotal: (total) => `共 ${total} 个用户`,
+            onChange: (page, pageSize) => setFilters((current) => ({ ...current, page, pageSize }))
+          }}
+          scroll={{ x: 1100 }}
+        />
+      </Space>
 
       <Modal
         title="创建用户"

@@ -3,11 +3,11 @@ package com.cexwallet.api.user;
 import com.cexwallet.api.audit.AuditLogService;
 import com.cexwallet.api.auth.AdminUser;
 import com.cexwallet.api.common.ApiResponse;
+import com.cexwallet.api.common.PageResponse;
 import com.cexwallet.api.user.UserDtos.CreateUserRequest;
 import com.cexwallet.api.user.UserDtos.UpdateUserKycLevelRequest;
 import com.cexwallet.api.user.UserDtos.UpdateUserStatusRequest;
 import jakarta.validation.Valid;
-import java.util.List;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -35,11 +35,14 @@ public class UserController {
     }
 
     @GetMapping
-    public ApiResponse<List<User>> list(
+    public ApiResponse<PageResponse<User>> list(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Integer kycLevel,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int pageSize
     ) {
-        return ApiResponse.ok(userService.findAll(page, pageSize));
+        return ApiResponse.ok(userService.findAll(keyword, status, kycLevel, page, pageSize));
     }
 
     @GetMapping("/{id}")

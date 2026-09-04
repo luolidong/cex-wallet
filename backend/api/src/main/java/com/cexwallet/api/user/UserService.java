@@ -1,6 +1,7 @@
 package com.cexwallet.api.user;
 
 import com.cexwallet.api.common.BusinessException;
+import com.cexwallet.api.common.PageResponse;
 import java.util.List;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
@@ -22,10 +23,15 @@ public class UserService {
         }
     }
 
-    public List<User> findAll(int page, int pageSize) {
+    public PageResponse<User> findAll(String keyword, String status, Integer kycLevel, int page, int pageSize) {
+        String normalizedStatus = normalizeOptionalStatus(status);
+        Integer normalizedKycLevel = kycLevel == null ? null : normalizeKycLevel(kycLevel);
         int normalizedPage = Math.max(page, 1);
         int normalizedPageSize = Math.min(Math.max(pageSize, 1), 100);
-        return userRepository.findAll(normalizedPageSize, (normalizedPage - 1) * normalizedPageSize);
+        int offset = (normalizedPage - 1) * normalizedPageSize;
+        List<User> items = userRepository.findAll(keyword, normalizedStatus, normalizedKycLevel, normalizedPageSize, offset);
+        long total = userRepository.countAll(keyword, normalizedStatus, normalizedKycLevel);
+        return new PageResponse<>(items, normalizedPage, normalizedPageSize, total);
     }
 
     public User findById(Long id) {
@@ -58,6 +64,13 @@ public class UserService {
             throw new BusinessException("INVALID_STATUS", "status must be ACTIVE or FROZEN", HttpStatus.BAD_REQUEST);
         }
         return status;
+    }
+
+    private String normalizeOptionalStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return null;
+        }
+        return normalizeStatus(status);
     }
 
     public User updateKycLevel(Long id, Integer kycLevel) {

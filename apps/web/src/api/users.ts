@@ -1,4 +1,5 @@
 import { http } from './http';
+import type { PageResult } from './wallets';
 
 export interface User {
   id: number;
@@ -86,8 +87,16 @@ export interface CreateWithdrawalInput {
   amount: string;
 }
 
-export async function listUsers(): Promise<User[]> {
-  const response = await http.get<{ success: boolean; data: User[] }>('/users');
+export interface ListUsersParams {
+  keyword?: string;
+  status?: string;
+  kycLevel?: number;
+  page?: number;
+  pageSize?: number;
+}
+
+export async function listUsers(params: ListUsersParams): Promise<PageResult<User>> {
+  const response = await http.get<{ success: boolean; data: PageResult<User> }>('/users', { params });
   return response.data.data;
 }
 
