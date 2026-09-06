@@ -125,6 +125,15 @@ public class AssetRepository {
         return updated == 1;
     }
 
+    public boolean enablePlatformWallet(Long id) {
+        int updated = jdbcTemplate.update("""
+                UPDATE platform_wallets
+                SET status = 'ACTIVE', updated_at = NOW()
+                WHERE id = ?
+                """, id);
+        return updated == 1;
+    }
+
     private PlatformWalletView findPlatformWallet(Long id) {
         return jdbcTemplate.queryForObject("""
                 SELECT pw.id, pw.chain_id, c.name AS chain_name, pw.token_id, t.symbol AS token_symbol,

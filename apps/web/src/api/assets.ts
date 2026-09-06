@@ -122,3 +122,8 @@ export async function disablePlatformWallet(id: number): Promise<PlatformWallet[
   const response = await http.delete<{ success: boolean; data: PlatformWallet[] }>(`/assets/platform-wallets/${id}`);
   return response.data.data;
 }
+
+export async function enablePlatformWallet(id: number): Promise<PlatformWallet[]> {
+  const response = await http.post<{ success: boolean; data: PlatformWallet[] }>(`/assets/platform-wallets/${id}/enable`);
+  return response.data.data;
+}

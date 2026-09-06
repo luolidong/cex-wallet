@@ -68,4 +68,12 @@ public class AssetService {
         }
         return assetRepository.findPlatformWallets();
     }
+
+    @Transactional
+    public List<PlatformWalletView> enablePlatformWallet(Long id) {
+        if (!assetRepository.enablePlatformWallet(id)) {
+            throw new BusinessException("NOT_FOUND", "platform wallet not found", HttpStatus.NOT_FOUND);
+        }
+        return assetRepository.findPlatformWallets();
+    }
 }

@@ -1,4 +1,4 @@
-import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { CheckOutlined, DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Form, Input, InputNumber, Modal, Select, Space, Switch, Table, Tabs, Tag, Typography, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
@@ -6,6 +6,7 @@ import { useState } from 'react';
 import {
   createPlatformWallet,
   disablePlatformWallet,
+  enablePlatformWallet,
   listChains,
   listPlatformWallets,
   listTokens,
@@ -144,6 +145,17 @@ export function AssetManagementPage() {
     onError: (error) => showRequestError(error, '停用平台钱包失败')
   });
 
+  const enableWalletMutation = useMutation({
+    mutationFn: enablePlatformWallet,
+    onSuccess: async () => {
+      message.success('平台钱包已启用');
+      await queryClient.invalidateQueries({ queryKey: ['assets', 'platform-wallets'] });
+      await queryClient.invalidateQueries({ queryKey: ['reconciliation', 'tokens'] });
+      await queryClient.invalidateQueries({ queryKey: ['audit-logs'] });
+    },
+    onError: (error) => showRequestError(error, '启用平台钱包失败')
+  });
+
   const chainColumns: ColumnsType<ChainAsset> = [
     { title: '链', dataIndex: 'name', width: 180 },
     { title: '类型', dataIndex: 'chainType', width: 110 },
@@ -254,6 +266,16 @@ export function AssetManagementPage() {
             onClick={() => disableWalletMutation.mutate(record.id)}
           >
             停用
+          </Button>
+          <Button
+            size="small"
+            type="primary"
+            icon={<CheckOutlined />}
+            disabled={record.status === 'ACTIVE'}
+            loading={enableWalletMutation.isPending}
+            onClick={() => enableWalletMutation.mutate(record.id)}
+          >
+            启用
           </Button>
         </Space>
       )

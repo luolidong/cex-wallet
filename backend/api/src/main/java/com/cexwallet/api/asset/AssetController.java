@@ -99,4 +99,14 @@ public class AssetController {
         auditLogService.record(adminUser, "PLATFORM_WALLET_DISABLE", "PLATFORM_WALLET", id, "停用平台钱包", null);
         return ApiResponse.ok(wallets);
     }
+
+    @PostMapping("/platform-wallets/{id}/enable")
+    public ApiResponse<List<PlatformWalletView>> enablePlatformWallet(
+            @PathVariable Long id,
+            @AuthenticationPrincipal AdminUser adminUser
+    ) {
+        List<PlatformWalletView> wallets = assetService.enablePlatformWallet(id);
+        auditLogService.record(adminUser, "PLATFORM_WALLET_ENABLE", "PLATFORM_WALLET", id, "启用平台钱包", null);
+        return ApiResponse.ok(wallets);
+    }
 }
