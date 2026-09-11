@@ -92,11 +92,7 @@ func (b *Broadcaster) broadcastNative(ctx context.Context, input api.BroadcastWi
 		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("cast send did not return transaction hash: %s", sanitizeCastOutput(string(output)))
 	}
 
-	return api.BroadcastWithdrawalResponse{
-		TxHash:         txHash,
-		RawTransaction: "",
-		Status:         "BROADCASTED",
-	}, nil
+	return api.BroadcastWithdrawalResponse{TxHash: txHash, RawTransaction: "", Status: "BROADCASTED"}, nil
 }
 
 func (b *Broadcaster) broadcastERC20(ctx context.Context, input api.BroadcastWithdrawalRequest, nonce uint64, gasLimit uint64) (api.BroadcastWithdrawalResponse, error) {
@@ -122,11 +118,7 @@ func (b *Broadcaster) broadcastERC20(ctx context.Context, input api.BroadcastWit
 		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("cast erc20 transfer did not return transaction hash: %s", sanitizeCastOutput(string(output)))
 	}
 
-	return api.BroadcastWithdrawalResponse{
-		TxHash:         txHash,
-		RawTransaction: "",
-		Status:         "BROADCASTED",
-	}, nil
+	return api.BroadcastWithdrawalResponse{TxHash: txHash, RawTransaction: "", Status: "BROADCASTED"}, nil
 }
 
 func buildEstimateCall(from string, input api.BroadcastWithdrawalRequest) (rpcCall, error) {
@@ -138,7 +130,9 @@ func buildEstimateCall(from string, input api.BroadcastWithdrawalRequest) (rpcCa
 		return rpcCall{From: from, To: input.TokenAddress, Data: data}, nil
 	}
 	amount := new(big.Int)
-	amount.SetString(input.Amount, 10)
+	if _, ok := amount.SetString(input.Amount, 10); !ok {
+		return rpcCall{}, fmt.Errorf("invalid native amount")
+	}
 	return rpcCall{From: from, To: input.ToAddress, Value: "0x" + amount.Text(16)}, nil
 }
 
@@ -221,7 +215,7 @@ func extractTxHash(output string) string {
 				if strings.HasPrefix(part, "0x") && len(part) == 66 {
 					return part
 				}
-		}
+			}
 		}
 	}
 	for _, field := range strings.Fields(output) {
