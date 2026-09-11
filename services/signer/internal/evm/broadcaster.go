@@ -36,25 +36,49 @@ func (b *Broadcaster) Broadcast(ctx context.Context, input api.BroadcastWithdraw
 	if b.cfg.EVMPrivateKey == "" {
 		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("EVM_HOT_WALLET_PRIVATE_KEY is required when SIGNER_MODE=real")
 	}
+	if !isEVMAddress(b.cfg.EVMHotWalletAddress) {
+		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("EVM_HOT_WALLET_ADDRESS must be a valid EVM address when SIGNER_MODE=real")
+	}
 
-	// One hot-wallet key must not race multiple local `cast send` processes for
-	// the same pending nonce. This is an in-process guard; a durable/distributed
-	// nonce manager is the next step before running multiple signer replicas.
+	// Serialize one hot wallet inside a signer process. The pending nonce is read
+	// while holding this lock so two local broadcasts cannot reserve the same
+	// nonce. Multiple signer replicas still require a distributed nonce manager.
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if strings.EqualFold(input.TokenType, "ERC20") {
-		return b.broadcastERC20(ctx, input)
+	rpc := newRPCClient(b.cfg.EVMRPCURL)
+	nonce, err := rpc.PendingNonce(ctx, b.cfg.EVMHotWalletAddress)
+	if err != nil {
+		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("load pending nonce: %w", err)
 	}
-	return b.broadcastNative(ctx, input)
+
+	call, err := buildEstimateCall(b.cfg.EVMHotWalletAddress, input)
+	if err != nil {
+		return api.BroadcastWithdrawalResponse{}, err
+	}
+	estimatedGas, err := rpc.EstimateGas(ctx, call)
+	if err != nil {
+		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("estimate gas: %w", err)
+	}
+	gasLimit, err := applyGasMargin(estimatedGas, b.cfg.EVMGasLimitMultiplierBPS)
+	if err != nil {
+		return api.BroadcastWithdrawalResponse{}, err
+	}
+
+	if strings.EqualFold(input.TokenType, "ERC20") {
+		return b.broadcastERC20(ctx, input, nonce, gasLimit)
+	}
+	return b.broadcastNative(ctx, input, nonce, gasLimit)
 }
 
-func (b *Broadcaster) broadcastNative(ctx context.Context, input api.BroadcastWithdrawalRequest) (api.BroadcastWithdrawalResponse, error) {
+func (b *Broadcaster) broadcastNative(ctx context.Context, input api.BroadcastWithdrawalRequest, nonce uint64, gasLimit uint64) (api.BroadcastWithdrawalResponse, error) {
 	output, err := exec.CommandContext(ctx,
 		"cast",
 		"send",
 		input.ToAddress,
 		"--value", input.Amount+"wei",
+		"--nonce", fmt.Sprintf("%d", nonce),
+		"--gas-limit", fmt.Sprintf("%d", gasLimit),
 		"--private-key", b.cfg.EVMPrivateKey,
 		"--rpc-url", b.cfg.EVMRPCURL,
 		"--json",
@@ -68,17 +92,10 @@ func (b *Broadcaster) broadcastNative(ctx context.Context, input api.BroadcastWi
 		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("cast send did not return transaction hash: %s", sanitizeCastOutput(string(output)))
 	}
 
-	return api.BroadcastWithdrawalResponse{
-		TxHash:         txHash,
-		RawTransaction: "",
-		Status:         "BROADCASTED",
-	}, nil
+	return api.BroadcastWithdrawalResponse{TxHash: txHash, RawTransaction: "", Status: "BROADCASTED"}, nil
 }
 
-func (b *Broadcaster) broadcastERC20(ctx context.Context, input api.BroadcastWithdrawalRequest) (api.BroadcastWithdrawalResponse, error) {
-	if input.TokenAddress == "" {
-		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("tokenAddress is required for ERC20 withdrawal")
-	}
+func (b *Broadcaster) broadcastERC20(ctx context.Context, input api.BroadcastWithdrawalRequest, nonce uint64, gasLimit uint64) (api.BroadcastWithdrawalResponse, error) {
 	output, err := exec.CommandContext(ctx,
 		"cast",
 		"send",
@@ -86,6 +103,8 @@ func (b *Broadcaster) broadcastERC20(ctx context.Context, input api.BroadcastWit
 		"transfer(address,uint256)",
 		input.ToAddress,
 		input.Amount,
+		"--nonce", fmt.Sprintf("%d", nonce),
+		"--gas-limit", fmt.Sprintf("%d", gasLimit),
 		"--private-key", b.cfg.EVMPrivateKey,
 		"--rpc-url", b.cfg.EVMRPCURL,
 		"--json",
@@ -99,11 +118,39 @@ func (b *Broadcaster) broadcastERC20(ctx context.Context, input api.BroadcastWit
 		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("cast erc20 transfer did not return transaction hash: %s", sanitizeCastOutput(string(output)))
 	}
 
-	return api.BroadcastWithdrawalResponse{
-		TxHash:         txHash,
-		RawTransaction: "",
-		Status:         "BROADCASTED",
-	}, nil
+	return api.BroadcastWithdrawalResponse{TxHash: txHash, RawTransaction: "", Status: "BROADCASTED"}, nil
+}
+
+func buildEstimateCall(from string, input api.BroadcastWithdrawalRequest) (rpcCall, error) {
+	if strings.EqualFold(input.TokenType, "ERC20") {
+		data, err := encodeERC20Transfer(input.ToAddress, input.Amount)
+		if err != nil {
+			return rpcCall{}, err
+		}
+		return rpcCall{From: from, To: input.TokenAddress, Data: data}, nil
+	}
+	amount := new(big.Int)
+	if _, ok := amount.SetString(input.Amount, 10); !ok {
+		return rpcCall{}, fmt.Errorf("invalid native amount")
+	}
+	return rpcCall{From: from, To: input.ToAddress, Value: "0x" + amount.Text(16)}, nil
+}
+
+func encodeERC20Transfer(toAddress string, amountValue string) (string, error) {
+	if !isEVMAddress(toAddress) {
+		return "", fmt.Errorf("invalid ERC20 transfer destination")
+	}
+	amount := new(big.Int)
+	if _, ok := amount.SetString(strings.TrimSpace(amountValue), 10); !ok || amount.Sign() <= 0 {
+		return "", fmt.Errorf("invalid ERC20 transfer amount")
+	}
+	if amount.BitLen() > 256 {
+		return "", fmt.Errorf("ERC20 transfer amount exceeds uint256")
+	}
+	addressWord := strings.Repeat("0", 24) + strings.ToLower(strings.TrimPrefix(toAddress, "0x"))
+	amountHex := amount.Text(16)
+	amountWord := strings.Repeat("0", 64-len(amountHex)) + amountHex
+	return "0xa9059cbb" + addressWord + amountWord, nil
 }
 
 func validateBroadcastInput(input api.BroadcastWithdrawalRequest) error {
@@ -116,6 +163,9 @@ func validateBroadcastInput(input api.BroadcastWithdrawalRequest) error {
 	amount := new(big.Int)
 	if _, ok := amount.SetString(strings.TrimSpace(input.Amount), 10); !ok || amount.Sign() <= 0 {
 		return fmt.Errorf("amount must be a positive base-unit integer")
+	}
+	if amount.BitLen() > 256 {
+		return fmt.Errorf("amount exceeds uint256")
 	}
 	if strings.EqualFold(input.TokenType, "ERC20") && !isEVMAddress(input.TokenAddress) {
 		return fmt.Errorf("invalid ERC20 tokenAddress")
