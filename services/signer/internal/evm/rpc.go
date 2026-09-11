@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"net/http"
 	"strconv"
 	"strings"
@@ -74,6 +75,47 @@ func (c *rpcClient) EstimateGas(ctx context.Context, call rpcCall) (uint64, erro
 	return gas, nil
 }
 
+func (c *rpcClient) ChainID(ctx context.Context) (*big.Int, error) {
+	var result string
+	if err := c.call(ctx, "eth_chainId", nil, &result); err != nil {
+		return nil, err
+	}
+	value, err := parseHexBig(result)
+	if err != nil {
+		return nil, fmt.Errorf("parse chain id: %w", err)
+	}
+	if value.Sign() <= 0 {
+		return nil, fmt.Errorf("chain id must be positive")
+	}
+	return value, nil
+}
+
+func (c *rpcClient) GasPrice(ctx context.Context) (*big.Int, error) {
+	var result string
+	if err := c.call(ctx, "eth_gasPrice", nil, &result); err != nil {
+		return nil, err
+	}
+	value, err := parseHexBig(result)
+	if err != nil {
+		return nil, fmt.Errorf("parse gas price: %w", err)
+	}
+	if value.Sign() <= 0 {
+		return nil, fmt.Errorf("gas price must be positive")
+	}
+	return value, nil
+}
+
+func (c *rpcClient) SendRawTransaction(ctx context.Context, rawTransaction string) (string, error) {
+	var txHash string
+	if err := c.call(ctx, "eth_sendRawTransaction", []any{rawTransaction}, &txHash); err != nil {
+		return "", err
+	}
+	if !strings.HasPrefix(txHash, "0x") || len(txHash) != 66 {
+		return "", fmt.Errorf("invalid transaction hash returned by RPC")
+	}
+	return txHash, nil
+}
+
 func (c *rpcClient) call(ctx context.Context, method string, params []any, output any) error {
 	body, err := json.Marshal(rpcRequest{JSONRPC: "2.0", ID: 1, Method: method, Params: params})
 	if err != nil {
@@ -114,6 +156,18 @@ func parseHexUint64(value string) (uint64, error) {
 		return 0, fmt.Errorf("invalid hex quantity %q", value)
 	}
 	return strconv.ParseUint(cleaned[2:], 16, 64)
+}
+
+func parseHexBig(value string) (*big.Int, error) {
+	cleaned := strings.TrimSpace(value)
+	if !strings.HasPrefix(cleaned, "0x") || len(cleaned) <= 2 {
+		return nil, fmt.Errorf("invalid hex quantity %q", value)
+	}
+	result := new(big.Int)
+	if _, ok := result.SetString(cleaned[2:], 16); !ok {
+		return nil, fmt.Errorf("invalid hex quantity %q", value)
+	}
+	return result, nil
 }
 
 func applyGasMargin(estimate uint64, multiplierBPS int64) (uint64, error) {
