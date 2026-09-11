@@ -2,6 +2,7 @@ package evm
 
 import (
 	"context"
+	"math/big"
 	"strings"
 	"testing"
 
@@ -65,9 +66,39 @@ func TestMockBroadcastReturnsTransactionHash(t *testing.T) {
 	}
 }
 
-func TestExtractTxHash(t *testing.T) {
-	hash := "0x" + strings.Repeat("a", 64)
-	if got := extractTxHash(`{"transactionHash":"` + hash + `"}`); got != hash {
-		t.Fatalf("extractTxHash() = %q, want %q", got, hash)
+func TestBuildLegacyNativeTransaction(t *testing.T) {
+	tx, err := buildLegacyTransaction(api.BroadcastWithdrawalRequest{
+		WithdrawalID: 1,
+		TokenType:    "NATIVE",
+		ToAddress:    "0x1111111111111111111111111111111111111111",
+		Amount:       "100",
+	}, 7, 25200, big.NewInt(2_000_000_000))
+	if err != nil {
+		t.Fatalf("buildLegacyTransaction() error = %v", err)
+	}
+	if tx.Nonce() != 7 || tx.Gas() != 25200 || tx.Value().Cmp(big.NewInt(100)) != 0 {
+		t.Fatalf("unexpected native transaction: nonce=%d gas=%d value=%s", tx.Nonce(), tx.Gas(), tx.Value())
+	}
+	if tx.To() == nil || !strings.EqualFold(tx.To().Hex(), "0x1111111111111111111111111111111111111111") {
+		t.Fatalf("unexpected native transaction destination: %v", tx.To())
+	}
+}
+
+func TestBuildLegacyERC20Transaction(t *testing.T) {
+	tx, err := buildLegacyTransaction(api.BroadcastWithdrawalRequest{
+		WithdrawalID: 1,
+		TokenType:    "ERC20",
+		TokenAddress: "0x2222222222222222222222222222222222222222",
+		ToAddress:    "0x1111111111111111111111111111111111111111",
+		Amount:       "100",
+	}, 8, 70000, big.NewInt(2_000_000_000))
+	if err != nil {
+		t.Fatalf("buildLegacyTransaction() error = %v", err)
+	}
+	if tx.Value().Sign() != 0 || len(tx.Data()) != 68 {
+		t.Fatalf("unexpected ERC20 transaction value/data: value=%s dataLen=%d", tx.Value(), len(tx.Data()))
+	}
+	if tx.To() == nil || !strings.EqualFold(tx.To().Hex(), "0x2222222222222222222222222222222222222222") {
+		t.Fatalf("unexpected ERC20 contract destination: %v", tx.To())
 	}
 }

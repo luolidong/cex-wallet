@@ -3,20 +3,26 @@ package evm
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"math/big"
-	"os/exec"
 	"strings"
 	"sync"
 	"time"
 
 	"cex-wallet/services/signer/internal/api"
 	"cex-wallet/services/signer/internal/config"
+	"cex-wallet/services/signer/internal/keyprovider"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 )
 
 type Broadcaster struct {
-	cfg config.Config
-	mu  sync.Mutex
+	cfg          config.Config
+	mu           sync.Mutex
+	providerOnce sync.Once
+	provider     keyprovider.Provider
+	providerErr  error
 }
 
 func NewBroadcaster(cfg config.Config) *Broadcaster {
@@ -33,26 +39,30 @@ func (b *Broadcaster) Broadcast(ctx context.Context, input api.BroadcastWithdraw
 	if strings.TrimSpace(b.cfg.EVMRPCURL) == "" {
 		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("EVM_RPC_URL is required when SIGNER_MODE=real")
 	}
-	if b.cfg.EVMPrivateKey == "" {
-		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("EVM_HOT_WALLET_PRIVATE_KEY is required when SIGNER_MODE=real")
-	}
 	if !isEVMAddress(b.cfg.EVMHotWalletAddress) {
 		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("EVM_HOT_WALLET_ADDRESS must be a valid EVM address when SIGNER_MODE=real")
 	}
 
-	// Serialize one hot wallet inside a signer process. The pending nonce is read
-	// while holding this lock so two local broadcasts cannot reserve the same
-	// nonce. Multiple signer replicas still require a distributed nonce manager.
+	provider, err := b.keyProvider()
+	if err != nil {
+		return api.BroadcastWithdrawalResponse{}, err
+	}
+	if !strings.EqualFold(provider.Address().Hex(), b.cfg.EVMHotWalletAddress) {
+		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("configured hot wallet address does not match signing key")
+	}
+
+	// Serialize one hot wallet inside a signer process. Nonce reservation and
+	// signing happen under the same lock so local broadcasts cannot reuse a
+	// pending nonce. Multi-replica deployments still need distributed locking.
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
 	rpc := newRPCClient(b.cfg.EVMRPCURL)
-	nonce, err := rpc.PendingNonce(ctx, b.cfg.EVMHotWalletAddress)
+	nonce, err := rpc.PendingNonce(ctx, provider.Address().Hex())
 	if err != nil {
 		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("load pending nonce: %w", err)
 	}
-
-	call, err := buildEstimateCall(b.cfg.EVMHotWalletAddress, input)
+	call, err := buildEstimateCall(provider.Address().Hex(), input)
 	if err != nil {
 		return api.BroadcastWithdrawalResponse{}, err
 	}
@@ -64,61 +74,86 @@ func (b *Broadcaster) Broadcast(ctx context.Context, input api.BroadcastWithdraw
 	if err != nil {
 		return api.BroadcastWithdrawalResponse{}, err
 	}
+	chainID, err := rpc.ChainID(ctx)
+	if err != nil {
+		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("load chain id: %w", err)
+	}
+	gasPrice, err := rpc.GasPrice(ctx)
+	if err != nil {
+		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("load gas price: %w", err)
+	}
 
+	unsigned, err := buildLegacyTransaction(input, nonce, gasLimit, gasPrice)
+	if err != nil {
+		return api.BroadcastWithdrawalResponse{}, err
+	}
+	signed, err := provider.SignTransaction(unsigned, chainID)
+	if err != nil {
+		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("sign transaction: %w", err)
+	}
+	rawBytes, err := signed.MarshalBinary()
+	if err != nil {
+		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("encode signed transaction: %w", err)
+	}
+	rawTransaction := "0x" + hex.EncodeToString(rawBytes)
+	txHash, err := rpc.SendRawTransaction(ctx, rawTransaction)
+	if err != nil {
+		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("broadcast signed transaction: %w", err)
+	}
+	if !strings.EqualFold(txHash, signed.Hash().Hex()) {
+		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("RPC transaction hash does not match locally signed transaction")
+	}
+
+	return api.BroadcastWithdrawalResponse{TxHash: txHash, RawTransaction: "", Status: "BROADCASTED"}, nil
+}
+
+func (b *Broadcaster) keyProvider() (keyprovider.Provider, error) {
+	b.providerOnce.Do(func() {
+		if strings.TrimSpace(b.cfg.EVMPrivateKey) == "" {
+			b.providerErr = fmt.Errorf("EVM_HOT_WALLET_PRIVATE_KEY is required for local key provider")
+			return
+		}
+		b.provider, b.providerErr = keyprovider.NewLocalProvider(b.cfg.EVMPrivateKey)
+	})
+	return b.provider, b.providerErr
+}
+
+func buildLegacyTransaction(input api.BroadcastWithdrawalRequest, nonce uint64, gasLimit uint64, gasPrice *big.Int) (*types.Transaction, error) {
+	if gasPrice == nil || gasPrice.Sign() <= 0 {
+		return nil, fmt.Errorf("gas price must be positive")
+	}
+	amount := new(big.Int)
+	if _, ok := amount.SetString(strings.TrimSpace(input.Amount), 10); !ok || amount.Sign() <= 0 {
+		return nil, fmt.Errorf("invalid transaction amount")
+	}
+
+	var to common.Address
+	var value *big.Int
+	var data []byte
 	if strings.EqualFold(input.TokenType, "ERC20") {
-		return b.broadcastERC20(ctx, input, nonce, gasLimit)
-	}
-	return b.broadcastNative(ctx, input, nonce, gasLimit)
-}
-
-func (b *Broadcaster) broadcastNative(ctx context.Context, input api.BroadcastWithdrawalRequest, nonce uint64, gasLimit uint64) (api.BroadcastWithdrawalResponse, error) {
-	output, err := exec.CommandContext(ctx,
-		"cast",
-		"send",
-		input.ToAddress,
-		"--value", input.Amount+"wei",
-		"--nonce", fmt.Sprintf("%d", nonce),
-		"--gas-limit", fmt.Sprintf("%d", gasLimit),
-		"--private-key", b.cfg.EVMPrivateKey,
-		"--rpc-url", b.cfg.EVMRPCURL,
-		"--json",
-	).CombinedOutput()
-	if err != nil {
-		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("cast send failed: %w: %s", err, sanitizeCastOutput(string(output)))
+		to = common.HexToAddress(input.TokenAddress)
+		value = new(big.Int)
+		encoded, err := encodeERC20Transfer(input.ToAddress, input.Amount)
+		if err != nil {
+			return nil, err
+		}
+		data, err = hex.DecodeString(strings.TrimPrefix(encoded, "0x"))
+		if err != nil {
+			return nil, fmt.Errorf("decode ERC20 calldata: %w", err)
+		}
+	} else {
+		to = common.HexToAddress(input.ToAddress)
+		value = amount
 	}
 
-	txHash := extractTxHash(string(output))
-	if txHash == "" {
-		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("cast send did not return transaction hash: %s", sanitizeCastOutput(string(output)))
-	}
-
-	return api.BroadcastWithdrawalResponse{TxHash: txHash, RawTransaction: "", Status: "BROADCASTED"}, nil
-}
-
-func (b *Broadcaster) broadcastERC20(ctx context.Context, input api.BroadcastWithdrawalRequest, nonce uint64, gasLimit uint64) (api.BroadcastWithdrawalResponse, error) {
-	output, err := exec.CommandContext(ctx,
-		"cast",
-		"send",
-		input.TokenAddress,
-		"transfer(address,uint256)",
-		input.ToAddress,
-		input.Amount,
-		"--nonce", fmt.Sprintf("%d", nonce),
-		"--gas-limit", fmt.Sprintf("%d", gasLimit),
-		"--private-key", b.cfg.EVMPrivateKey,
-		"--rpc-url", b.cfg.EVMRPCURL,
-		"--json",
-	).CombinedOutput()
-	if err != nil {
-		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("cast erc20 transfer failed: %w: %s", err, sanitizeCastOutput(string(output)))
-	}
-
-	txHash := extractTxHash(string(output))
-	if txHash == "" {
-		return api.BroadcastWithdrawalResponse{}, fmt.Errorf("cast erc20 transfer did not return transaction hash: %s", sanitizeCastOutput(string(output)))
-	}
-
-	return api.BroadcastWithdrawalResponse{TxHash: txHash, RawTransaction: "", Status: "BROADCASTED"}, nil
+	return types.NewTx(&types.LegacyTx{
+		Nonce:    nonce,
+		GasPrice: new(big.Int).Set(gasPrice),
+		Gas:      gasLimit,
+		To:       &to,
+		Value:    value,
+		Data:     data,
+	}), nil
 }
 
 func buildEstimateCall(from string, input api.BroadcastWithdrawalRequest) (rpcCall, error) {
@@ -186,17 +221,6 @@ func isEVMAddress(value string) bool {
 	return true
 }
 
-func sanitizeCastOutput(output string) string {
-	output = strings.TrimSpace(output)
-	if output == "" {
-		return "no output"
-	}
-	if len(output) > 1024 {
-		return output[:1024] + "..."
-	}
-	return output
-}
-
 func mockBroadcast(input api.BroadcastWithdrawalRequest) api.BroadcastWithdrawalResponse {
 	hash := sha256.Sum256([]byte(fmt.Sprintf("withdrawal:%d:%s:%s:%d", input.WithdrawalID, input.ToAddress, input.Amount, time.Now().UnixNano())))
 	return api.BroadcastWithdrawalResponse{
@@ -204,25 +228,4 @@ func mockBroadcast(input api.BroadcastWithdrawalRequest) api.BroadcastWithdrawal
 		RawTransaction: "0xmock-signed-transaction",
 		Status:         "BROADCASTED",
 	}
-}
-
-func extractTxHash(output string) string {
-	for _, line := range strings.Split(output, "\n") {
-		line = strings.TrimSpace(line)
-		if strings.Contains(line, `"transactionHash"`) || strings.Contains(line, `"hash"`) {
-			parts := strings.Split(line, `"`)
-			for _, part := range parts {
-				if strings.HasPrefix(part, "0x") && len(part) == 66 {
-					return part
-				}
-			}
-		}
-	}
-	for _, field := range strings.Fields(output) {
-		field = strings.Trim(field, `\",`)
-		if strings.HasPrefix(field, "0x") && len(field) == 66 {
-			return field
-		}
-	}
-	return ""
 }
