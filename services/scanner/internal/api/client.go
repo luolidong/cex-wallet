@@ -95,6 +95,8 @@ type BroadcastedWithdrawal struct {
 	TokenID       int64  `json:"tokenId"`
 	Symbol        string `json:"symbol"`
 	TxHash        string `json:"txHash"`
+	ChainType     string `json:"chainType"`
+	RPCURL        string `json:"rpcUrl"`
 	ConfirmBlocks int    `json:"confirmBlocks"`
 	Status        string `json:"status"`
 }
