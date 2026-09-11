@@ -95,6 +95,8 @@ public class ScannerDtos {
             Long tokenId,
             String symbol,
             String txHash,
+            String chainType,
+            String rpcUrl,
             Integer confirmBlocks,
             String status
     ) {
