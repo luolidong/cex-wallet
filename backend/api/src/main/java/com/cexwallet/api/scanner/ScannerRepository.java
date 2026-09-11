@@ -90,12 +90,14 @@ public class ScannerRepository {
 
     public List<BroadcastedWithdrawalView> findBroadcastedWithdrawals() {
         return jdbcTemplate.query("""
-                SELECT w.id, w.user_id, w.chain_id, w.token_id, t.symbol, w.tx_hash, c.confirm_blocks, w.status
+                SELECT w.id, w.user_id, w.chain_id, w.token_id, t.symbol, w.tx_hash,
+                       c.chain_type, c.rpc_url, c.confirm_blocks, w.status
                 FROM withdrawals w
                 JOIN tokens t ON t.id = w.token_id
                 JOIN chains c ON c.id = w.chain_id
                 WHERE w.status = 'BROADCASTED'
                   AND w.tx_hash IS NOT NULL
+                  AND c.status = 'ACTIVE'
                 ORDER BY w.id
                 LIMIT 50
                 """, (rs, rowNum) -> new BroadcastedWithdrawalView(
@@ -105,6 +107,8 @@ public class ScannerRepository {
                 rs.getLong("token_id"),
                 rs.getString("symbol"),
                 rs.getString("tx_hash"),
+                rs.getString("chain_type"),
+                rs.getString("rpc_url"),
                 rs.getInt("confirm_blocks"),
                 rs.getString("status")
         ));
