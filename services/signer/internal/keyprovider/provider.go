@@ -1,6 +1,7 @@
 package keyprovider
 
 import (
+	"crypto/ecdsa"
 	"fmt"
 	"math/big"
 	"strings"
@@ -19,8 +20,8 @@ type Provider interface {
 }
 
 type LocalProvider struct {
-	privateKeyHex string
-	address       common.Address
+	privateKey *ecdsa.PrivateKey
+	address    common.Address
 }
 
 func NewLocalProvider(privateKeyHex string) (*LocalProvider, error) {
@@ -33,8 +34,8 @@ func NewLocalProvider(privateKeyHex string) (*LocalProvider, error) {
 		return nil, fmt.Errorf("parse local signing key: %w", err)
 	}
 	return &LocalProvider{
-		privateKeyHex: cleaned,
-		address:       crypto.PubkeyToAddress(privateKey.PublicKey),
+		privateKey: privateKey,
+		address:    crypto.PubkeyToAddress(privateKey.PublicKey),
 	}, nil
 }
 
@@ -43,9 +44,11 @@ func (p *LocalProvider) Address() common.Address {
 }
 
 func (p *LocalProvider) SignTransaction(tx *types.Transaction, chainID *big.Int) (*types.Transaction, error) {
-	privateKey, err := crypto.HexToECDSA(p.privateKeyHex)
-	if err != nil {
-		return nil, fmt.Errorf("load local signing key: %w", err)
+	if tx == nil {
+		return nil, fmt.Errorf("transaction is nil")
 	}
-	return types.SignTx(tx, types.LatestSignerForChainID(chainID), privateKey)
+	if chainID == nil || chainID.Sign() <= 0 {
+		return nil, fmt.Errorf("chain id must be positive")
+	}
+	return types.SignTx(tx, types.LatestSignerForChainID(chainID), p.privateKey)
 }
