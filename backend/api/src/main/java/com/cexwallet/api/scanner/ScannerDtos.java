@@ -104,4 +104,11 @@ public class ScannerDtos {
 
     public record ConfirmWithdrawalRequest(@NotNull Long withdrawalId, @NotBlank String txHash) {
     }
+
+    public record FailWithdrawalRequest(
+            @NotNull Long withdrawalId,
+            @NotBlank String txHash,
+            @NotBlank String reason
+    ) {
+    }
 }
