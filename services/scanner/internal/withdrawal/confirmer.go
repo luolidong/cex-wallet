@@ -58,10 +58,16 @@ func (c *Confirmer) ConfirmOnce(ctx context.Context) (Result, error) {
 			return result, fmt.Errorf("withdrawal %d receipt status: %w", item.ID, err)
 		}
 		if status == 0 {
-			// P0-2 will notify Java to transition FAILED and refund. Until that
-			// endpoint is wired, never incorrectly mark a reverted tx CONFIRMED.
+			_, err = c.client.FailWithdrawal(ctx, api.FailWithdrawalRequest{
+				WithdrawalID: item.ID,
+				TxHash:       item.TxHash,
+				Reason:       "EVM transaction reverted on-chain",
+			})
+			if err != nil {
+				return result, fmt.Errorf("fail withdrawal %d: %w", item.ID, err)
+			}
 			result.Failed++
-			log.Printf("withdrawal confirmer detected failed receipt id=%d tx=%s", item.ID, item.TxHash)
+			log.Printf("withdrawal confirmer failed id=%d tx=%s receiptStatus=%s", item.ID, item.TxHash, receipt.Status)
 			continue
 		}
 		if status != 1 {
