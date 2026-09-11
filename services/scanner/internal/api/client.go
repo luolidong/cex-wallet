@@ -62,7 +62,7 @@ type TokenConfig struct {
 	TokenType    string  `json:"tokenType"`
 	Decimals     int     `json:"decimals"`
 	NativeToken  bool    `json:"nativeToken"`
-	Status       string  `json:"status"`
+	Status       string `json:"status"`
 }
 
 type DepositAddress struct {
@@ -95,6 +95,8 @@ type BroadcastedWithdrawal struct {
 	TokenID       int64  `json:"tokenId"`
 	Symbol        string `json:"symbol"`
 	TxHash        string `json:"txHash"`
+	ChainType     string `json:"chainType"`
+	RPCURL        string `json:"rpcUrl"`
 	ConfirmBlocks int    `json:"confirmBlocks"`
 	Status        string `json:"status"`
 }
@@ -102,6 +104,12 @@ type BroadcastedWithdrawal struct {
 type ConfirmWithdrawalRequest struct {
 	WithdrawalID int64  `json:"withdrawalId"`
 	TxHash       string `json:"txHash"`
+}
+
+type FailWithdrawalRequest struct {
+	WithdrawalID int64  `json:"withdrawalId"`
+	TxHash       string `json:"txHash"`
+	Reason       string `json:"reason"`
 }
 
 type WithdrawalResponse struct {
@@ -177,6 +185,18 @@ func (c *Client) ListBroadcastedWithdrawals(ctx context.Context) ([]BroadcastedW
 func (c *Client) ConfirmWithdrawal(ctx context.Context, input ConfirmWithdrawalRequest) (WithdrawalResponse, error) {
 	var output envelope[WithdrawalResponse]
 	err := c.post(ctx, "/api/internal/scanner/withdrawals/confirmed", input, &output)
+	if err != nil {
+		return WithdrawalResponse{}, err
+	}
+	if !output.Success {
+		return WithdrawalResponse{}, fmt.Errorf("api returned unsuccessful response: %s", output.Message)
+	}
+	return output.Data, nil
+}
+
+func (c *Client) FailWithdrawal(ctx context.Context, input FailWithdrawalRequest) (WithdrawalResponse, error) {
+	var output envelope[WithdrawalResponse]
+	err := c.post(ctx, "/api/internal/scanner/withdrawals/failed", input, &output)
 	if err != nil {
 		return WithdrawalResponse{}, err
 	}

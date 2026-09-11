@@ -95,11 +95,20 @@ public class ScannerDtos {
             Long tokenId,
             String symbol,
             String txHash,
+            String chainType,
+            String rpcUrl,
             Integer confirmBlocks,
             String status
     ) {
     }
 
     public record ConfirmWithdrawalRequest(@NotNull Long withdrawalId, @NotBlank String txHash) {
+    }
+
+    public record FailWithdrawalRequest(
+            @NotNull Long withdrawalId,
+            @NotBlank String txHash,
+            @NotBlank String reason
+    ) {
     }
 }
