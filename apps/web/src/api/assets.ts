@@ -1,4 +1,5 @@
 import { http } from './http';
+import type { PageResult } from './wallets';
 
 export interface ChainAsset {
   id: number;
@@ -83,6 +84,16 @@ export interface UpdatePlatformWalletInput {
   remark?: string;
 }
 
+export interface ListPlatformWalletsParams {
+  keyword?: string;
+  chainId?: number;
+  tokenId?: number;
+  walletRole?: string;
+  status?: string;
+  page?: number;
+  pageSize?: number;
+}
+
 export async function listChains(): Promise<ChainAsset[]> {
   const response = await http.get<{ success: boolean; data: ChainAsset[] }>('/assets/chains');
   return response.data.data;
@@ -103,8 +114,8 @@ export async function updateToken(id: number, input: UpdateTokenInput): Promise<
   return response.data.data;
 }
 
-export async function listPlatformWallets(): Promise<PlatformWallet[]> {
-  const response = await http.get<{ success: boolean; data: PlatformWallet[] }>('/assets/platform-wallets');
+export async function listPlatformWallets(params: ListPlatformWalletsParams): Promise<PageResult<PlatformWallet>> {
+  const response = await http.get<{ success: boolean; data: PageResult<PlatformWallet> }>('/assets/platform-wallets', { params });
   return response.data.data;
 }
 

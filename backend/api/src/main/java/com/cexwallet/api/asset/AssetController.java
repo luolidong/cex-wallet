@@ -9,6 +9,7 @@ import com.cexwallet.api.asset.AssetDtos.UpdateTokenRequest;
 import com.cexwallet.api.audit.AuditLogService;
 import com.cexwallet.api.auth.AdminUser;
 import com.cexwallet.api.common.ApiResponse;
+import com.cexwallet.api.common.PageResponse;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -65,8 +67,16 @@ public class AssetController {
     }
 
     @GetMapping("/platform-wallets")
-    public ApiResponse<List<PlatformWalletView>> platformWallets() {
-        return ApiResponse.ok(assetService.findPlatformWallets());
+    public ApiResponse<PageResponse<PlatformWalletView>> platformWallets(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long chainId,
+            @RequestParam(required = false) Long tokenId,
+            @RequestParam(required = false) String walletRole,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int pageSize
+    ) {
+        return ApiResponse.ok(assetService.findPlatformWallets(keyword, chainId, tokenId, walletRole, status, page, pageSize));
     }
 
     @PostMapping("/platform-wallets")

@@ -6,6 +6,7 @@ import com.cexwallet.api.asset.AssetDtos.TokenView;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -13,6 +14,9 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class AssetRepository {
     private final JdbcTemplate jdbcTemplate;
+
+    private record PlatformWalletQuery(StringBuilder sql, List<Object> args) {
+    }
 
     public AssetRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
@@ -89,6 +93,31 @@ public class AssetRepository {
                 """, this::mapPlatformWallet);
     }
 
+    public List<PlatformWalletView> findPlatformWallets(String keyword, Long chainId, Long tokenId, String walletRole, String status, int limit, int offset) {
+        PlatformWalletQuery query = buildPlatformWalletQuery("""
+                SELECT pw.id, pw.chain_id, c.name AS chain_name, pw.token_id, t.symbol AS token_symbol,
+                  pw.address, pw.wallet_role, pw.status, pw.remark
+                FROM platform_wallets pw
+                JOIN chains c ON c.id = pw.chain_id
+                LEFT JOIN tokens t ON t.id = pw.token_id
+                """, keyword, chainId, tokenId, walletRole, status);
+        query.sql().append(" ORDER BY pw.id DESC LIMIT ? OFFSET ?");
+        query.args().add(limit);
+        query.args().add(offset);
+        return jdbcTemplate.query(query.sql().toString(), this::mapPlatformWallet, query.args().toArray());
+    }
+
+    public long countPlatformWallets(String keyword, Long chainId, Long tokenId, String walletRole, String status) {
+        PlatformWalletQuery query = buildPlatformWalletQuery("""
+                SELECT COUNT(*)
+                FROM platform_wallets pw
+                JOIN chains c ON c.id = pw.chain_id
+                LEFT JOIN tokens t ON t.id = pw.token_id
+                """, keyword, chainId, tokenId, walletRole, status);
+        Long count = jdbcTemplate.queryForObject(query.sql().toString(), Long.class, query.args().toArray());
+        return count == null ? 0 : count;
+    }
+
     public PlatformWalletView createPlatformWallet(AssetDtos.CreatePlatformWalletRequest request) {
         Long id = jdbcTemplate.queryForObject("""
                 INSERT INTO platform_wallets (chain_id, token_id, address, wallet_role, status, remark)
@@ -143,6 +172,42 @@ public class AssetRepository {
                 LEFT JOIN tokens t ON t.id = pw.token_id
                 WHERE pw.id = ?
                 """, this::mapPlatformWallet, id);
+    }
+
+    private PlatformWalletQuery buildPlatformWalletQuery(String selectSql, String keyword, Long chainId, Long tokenId, String walletRole, String status) {
+        StringBuilder sql = new StringBuilder(selectSql).append(" WHERE 1 = 1");
+        List<Object> args = new ArrayList<>();
+        if (keyword != null && !keyword.isBlank()) {
+            String trimmedKeyword = keyword.trim();
+            String likeKeyword = "%" + trimmedKeyword.toLowerCase() + "%";
+            sql.append("""
+                     AND (lower(pw.address) LIKE ?
+                       OR lower(COALESCE(pw.remark, '')) LIKE ?
+                       OR lower(COALESCE(t.symbol, '')) LIKE ?
+                       OR CAST(pw.id AS TEXT) = ?)
+                    """);
+            args.add(likeKeyword);
+            args.add(likeKeyword);
+            args.add(likeKeyword);
+            args.add(trimmedKeyword);
+        }
+        if (chainId != null) {
+            sql.append(" AND pw.chain_id = ?");
+            args.add(chainId);
+        }
+        if (tokenId != null) {
+            sql.append(" AND pw.token_id = ?");
+            args.add(tokenId);
+        }
+        if (walletRole != null && !walletRole.isBlank()) {
+            sql.append(" AND pw.wallet_role = ?");
+            args.add(walletRole);
+        }
+        if (status != null && !status.isBlank()) {
+            sql.append(" AND pw.status = ?");
+            args.add(status);
+        }
+        return new PlatformWalletQuery(sql, args);
     }
 
     private ChainView mapChain(ResultSet rs, int rowNum) throws SQLException {

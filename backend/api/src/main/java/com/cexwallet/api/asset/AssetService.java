@@ -4,6 +4,7 @@ import com.cexwallet.api.asset.AssetDtos.ChainView;
 import com.cexwallet.api.asset.AssetDtos.PlatformWalletView;
 import com.cexwallet.api.asset.AssetDtos.TokenView;
 import com.cexwallet.api.common.BusinessException;
+import com.cexwallet.api.common.PageResponse;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -43,6 +44,15 @@ public class AssetService {
 
     public List<PlatformWalletView> findPlatformWallets() {
         return assetRepository.findPlatformWallets();
+    }
+
+    public PageResponse<PlatformWalletView> findPlatformWallets(String keyword, Long chainId, Long tokenId, String walletRole, String status, int page, int pageSize) {
+        int normalizedPage = Math.max(page, 1);
+        int normalizedPageSize = Math.min(Math.max(pageSize, 1), 100);
+        int offset = (normalizedPage - 1) * normalizedPageSize;
+        List<PlatformWalletView> items = assetRepository.findPlatformWallets(keyword, chainId, tokenId, walletRole, status, normalizedPageSize, offset);
+        long total = assetRepository.countPlatformWallets(keyword, chainId, tokenId, walletRole, status);
+        return new PageResponse<>(items, normalizedPage, normalizedPageSize, total);
     }
 
     @Transactional

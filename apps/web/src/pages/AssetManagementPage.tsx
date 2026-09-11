@@ -14,7 +14,7 @@ import {
   updatePlatformWallet,
   updateToken
 } from '../api/assets';
-import type { ChainAsset, PlatformWallet, TokenAsset } from '../api/assets';
+import type { ChainAsset, ListPlatformWalletsParams, PlatformWallet, TokenAsset } from '../api/assets';
 
 interface ChainFormValues {
   name: string;
@@ -46,7 +46,16 @@ interface PlatformWalletFormValues {
   remark?: string;
 }
 
+interface PlatformWalletFilterValues {
+  keyword?: string;
+  chainId?: number;
+  tokenId?: number;
+  walletRole?: string;
+  status?: string;
+}
+
 export function AssetManagementPage() {
+  const [walletFilters, setWalletFilters] = useState<ListPlatformWalletsParams>({ page: 1, pageSize: 20 });
   const [editingChain, setEditingChain] = useState<ChainAsset>();
   const [editingToken, setEditingToken] = useState<TokenAsset>();
   const [editingWallet, setEditingWallet] = useState<PlatformWallet>();
@@ -54,7 +63,9 @@ export function AssetManagementPage() {
   const [chainForm] = Form.useForm<ChainFormValues>();
   const [tokenForm] = Form.useForm<TokenFormValues>();
   const [walletForm] = Form.useForm<PlatformWalletFormValues>();
+  const [walletFilterForm] = Form.useForm<PlatformWalletFilterValues>();
   const selectedWalletChainId = Form.useWatch('chainId', walletForm);
+  const selectedWalletFilterChainId = Form.useWatch('chainId', walletFilterForm);
   const queryClient = useQueryClient();
 
   const chainsQuery = useQuery({
@@ -66,8 +77,8 @@ export function AssetManagementPage() {
     queryFn: listTokens
   });
   const platformWalletsQuery = useQuery({
-    queryKey: ['assets', 'platform-wallets'],
-    queryFn: listPlatformWallets
+    queryKey: ['assets', 'platform-wallets', walletFilters],
+    queryFn: () => listPlatformWallets(walletFilters)
   });
 
   const updateChainMutation = useMutation({
@@ -368,6 +379,27 @@ export function AssetManagementPage() {
     .filter((token) => !selectedWalletChainId || token.chainId === selectedWalletChainId)
     .map((token) => ({ value: token.id, label: `${token.symbol} / ${token.chainName}` }));
 
+  const walletFilterTokenOptions = (tokensQuery.data || [])
+    .filter((token) => !selectedWalletFilterChainId || token.chainId === selectedWalletFilterChainId)
+    .map((token) => ({ value: token.id, label: `${token.symbol} / ${token.chainName}` }));
+
+  function handleSearchWallets(values: PlatformWalletFilterValues) {
+    setWalletFilters({
+      keyword: values.keyword?.trim() || undefined,
+      chainId: values.chainId,
+      tokenId: values.tokenId,
+      walletRole: values.walletRole,
+      status: values.status,
+      page: 1,
+      pageSize: walletFilters.pageSize
+    });
+  }
+
+  function handleResetWallets() {
+    walletFilterForm.resetFields();
+    setWalletFilters({ page: 1, pageSize: walletFilters.pageSize });
+  }
+
   return (
     <>
       <div className="page-toolbar">
@@ -427,12 +459,68 @@ export function AssetManagementPage() {
                     新增钱包
                   </Button>
                 </div>
+                <Form form={walletFilterForm} layout="inline" onFinish={handleSearchWallets}>
+                  <Form.Item name="keyword">
+                    <Input allowClear placeholder="钱包 ID / 地址 / Token / 备注" />
+                  </Form.Item>
+                  <Form.Item name="chainId">
+                    <Select
+                      allowClear
+                      className="filter-select"
+                      placeholder="链"
+                      options={(chainsQuery.data || []).map((chain) => ({ value: chain.id, label: chain.name }))}
+                      onChange={() => walletFilterForm.setFieldValue('tokenId', undefined)}
+                    />
+                  </Form.Item>
+                  <Form.Item name="tokenId">
+                    <Select allowClear className="filter-select" placeholder="Token" options={walletFilterTokenOptions} />
+                  </Form.Item>
+                  <Form.Item name="walletRole">
+                    <Select
+                      allowClear
+                      className="filter-select"
+                      placeholder="角色"
+                      options={[
+                        { value: 'HOT', label: '热钱包' },
+                        { value: 'COLD', label: '冷钱包' },
+                        { value: 'COLLECTION', label: '归集钱包' },
+                        { value: 'FEE', label: '手续费钱包' }
+                      ]}
+                    />
+                  </Form.Item>
+                  <Form.Item name="status">
+                    <Select
+                      allowClear
+                      className="filter-select"
+                      placeholder="状态"
+                      options={[
+                        { value: 'ACTIVE', label: 'ACTIVE' },
+                        { value: 'INACTIVE', label: 'INACTIVE' }
+                      ]}
+                    />
+                  </Form.Item>
+                  <Form.Item>
+                    <Space>
+                      <Button type="primary" htmlType="submit">
+                        查询
+                      </Button>
+                      <Button onClick={handleResetWallets}>重置</Button>
+                    </Space>
+                  </Form.Item>
+                </Form>
                 <Table
                   rowKey="id"
                   columns={walletColumns}
-                  dataSource={platformWalletsQuery.data || []}
+                  dataSource={platformWalletsQuery.data?.items || []}
                   loading={platformWalletsQuery.isLoading}
-                  pagination={false}
+                  pagination={{
+                    current: platformWalletsQuery.data?.page || walletFilters.page || 1,
+                    pageSize: platformWalletsQuery.data?.pageSize || walletFilters.pageSize || 20,
+                    total: platformWalletsQuery.data?.total || 0,
+                    showSizeChanger: true,
+                    showTotal: (total) => `共 ${total} 个钱包`,
+                    onChange: (page, pageSize) => setWalletFilters((current) => ({ ...current, page, pageSize }))
+                  }}
                   scroll={{ x: 1200 }}
                 />
               </Space>
