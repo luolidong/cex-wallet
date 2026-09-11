@@ -1,437 +1,263 @@
-# CEX Wallet 项目实施路线文档
+# CEX Wallet 项目实施路线
 
-本文档用于指导项目从架构设计进入实际开发。执行原则是先完成最小可用闭环，再逐步增强链上、账务、安全和运维能力。
+本文档记录当前真实实现状态和后续开发优先级。执行原则：先保证资金安全闭环，再扩展链和运营能力。
 
-## 总体实施顺序
+## 当前阶段
+
+项目基础架构、Java API、React 管理后台、Ledger、EVM 充值、提现管理和主要运营页面已经具备。当前开发阶段从“功能搭建”切换为“资金链路生产化”。
+
+### 已完成的主要能力
+
+- React + Java + Go + PostgreSQL + Redis 工程结构与 Docker Compose。
+- 管理员登录、JWT、RBAC、权限管理与审计日志。
+- 用户管理、用户状态、KYC 与提现额度管理。
+- 链、Token、平台钱包等基础配置管理。
+- EVM 用户充值地址与充值扫描。
+- 充值记录、确认入账和 Ledger 双分录。
+- 提现申请与余额冻结。
+- 提现人工审核：通过 / 拒绝。
+- 提现广播状态管理。
+- 提现 CONFIRMED 处理与最终账务处理。
+- 提现 FAILED 处理与幂等退款。
+- Ledger journal 查询与人工账务调整。
+- Ledger reconciliation 与 EVM Native/ERC20 热钱包链上余额对账。
+- Dashboard、充值、提现、用户、钱包、账务、审计等运营页面。
+
+### 当前已知缺口
+
+- 提现 Scanner 当前不能把 BROADCASTED 直接视为链上成功；必须查询真实交易 receipt。
+- 提现链上失败需要由 Scanner 自动识别并驱动 FAILED/退款，而不是依赖人工操作。
+- Signer 的生产密钥隔离、nonce、gas 和广播可靠性仍需增强。
+- EVM 用户充值地址尚缺完整自动归集（Sweep）闭环。
+- 自动化测试和 CI 需要系统补齐。
+- Solana Scanner 与 Signer 仍处于占位阶段。
+- 资产对账目前主要覆盖 EVM 热钱包，尚未覆盖待归集地址、冷钱包和异常快照。
+
+## 后续实施顺序
 
 ```text
-1. 数据库设计
-2. API 设计
-3. 项目骨架初始化
-4. Java 后端基础能力
-5. React 前端基础能力
-6. Ledger 账务闭环
-7. 地址生成闭环
-8. 充值闭环
-9. 提现闭环
-10. 管理后台完善
-11. Docker Compose 一键启动
-12. 测试与验收
+P0 资金安全
+1. 提现真实链上确认
+2. 提现链上失败自动处理与退款
+3. 提现 nonce / gas / 广播可靠性
+4. Signer 密钥安全重构
+5. 核心资金链路自动测试
+6. CI
+
+P1 EVM 完整闭环
+7. 充值地址自动归集 Sweep
+8. 完整资产对账与异常处理
+9. 冷热钱包与热钱包补充
+
+P1 多链
+10. Solana 地址与充值扫描
+11. SOL / SPL 提现
+12. Solana Sweep
+
+P2 生产化
+13. 风控增强
+14. 监控与告警
+15. 灾难恢复
 ```
 
-每一步完成后都应留下可运行代码或明确文档，不跳步堆功能。
+## P0-1 提现真实链上确认
 
-## 第 1 步：数据库设计
+目标：`BROADCASTED` 只表示交易已经提交给链，不表示提现成功。
 
-目标：
-
-- 定义系统核心数据模型。
-- 明确用户、钱包地址、Token、链配置、充值、提现、账务、审核、审计日志之间的关系。
-- 确定 Ledger 账务结构，避免后续业务直接修改余额。
-
-产出物：
-
-- `docs/database-design.md`
-- PostgreSQL 表结构草案
-- Ledger 分录规则
-- 提现状态机字段定义
-- 充值状态字段定义
-
-主要内容：
-
-- 用户表 `users`
-- 管理员表 `admin_users`
-- 角色权限表 `roles`、`permissions`
-- 链配置表 `chains`
-- Token 配置表 `tokens`
-- 钱包地址表 `wallets`
-- 热钱包表 `hot_wallets`
-- 账务账户表 `ledger_accounts`
-- 账务流水表 `ledger_journals`
-- 账务分录表 `ledger_entries`
-- 充值表 `deposits`
-- 提现表 `withdrawals`
-- 提现审核表 `withdrawal_reviews`
-- 扫描进度表 `scan_progress`
-- 审计日志表 `audit_logs`
-
-验收标准：
-
-- 每个核心业务对象都有表。
-- 每笔资金变化都能映射到 Ledger journal 和 entries。
-- 可以表达充值入账、提现冻结、提现扣账、提现退款。
-- 金额字段不使用浮点数。
-
-## 第 2 步：API 设计
-
-目标：
-
-- 定义前端访问 Java API 的外部接口。
-- 定义 Go Scanner、Go Signer 与 Java API 的内部接口。
-- 统一请求响应格式、错误码、分页格式和鉴权方式。
-
-产出物：
-
-- `docs/api-design.md`
-- 前端 API 清单
-- 内部服务 API 清单
-- 响应格式规范
-- 错误码规范
-
-主要内容：
-
-- 登录接口
-- 用户管理接口
-- 用户钱包地址接口
-- 用户余额接口
-- 充值记录接口
-- 提现申请接口
-- 提现审核接口
-- 链配置接口
-- Token 配置接口
-- 热钱包接口
-- Scanner 上报充值接口
-- Scanner 上报提现确认接口
-- Signer 地址生成接口
-- Signer 签名接口
-
-验收标准：
-
-- React 前端可以按文档开发页面。
-- Java 后端可以按文档实现 Controller。
-- Go 服务可以按文档实现调用。
-- 外部接口和内部接口边界清晰。
-
-## 第 3 步：项目骨架初始化
-
-目标：
-
-- 创建前后端分离和 Go 服务目录结构。
-- 初始化各技术栈的最小可运行项目。
-
-产出物：
+EVM 状态判断：
 
 ```text
-apps/web
-backend/api
-services/scanner
-services/signer
-infra
-```
-
-主要任务：
-
-- 初始化 React + Vite + TypeScript 项目。
-- 初始化 Java Spring Boot 项目。
-- 初始化 Go scanner module。
-- 初始化 Go signer module。
-- 创建基础 `.gitignore`。
-- 创建环境变量示例文件。
-
-验收标准：
-
-- 前端可以启动开发服务。
-- Java API 可以启动并返回 `/health`。
-- Go Scanner 可以启动并返回日志。
-- Go Signer 可以启动并返回 `/health`。
-
-## 第 4 步：Java 后端基础能力
-
-目标：
-
-- 建立 Java API 的工程基础。
-- 接入数据库、Redis、鉴权、统一响应和异常处理。
-
-主要任务：
-
-- 配置 Spring Boot。
-- 配置 PostgreSQL 数据源。
-- 配置 Redis。
-- 配置 MyBatis Plus。
-- 增加统一响应结构。
-- 增加统一异常处理。
-- 增加 OpenAPI / Swagger。
-- 实现 `/health`。
-- 实现管理员登录接口。
-- 实现 JWT 鉴权。
-- 实现 RBAC 基础模型。
-
-验收标准：
-
-- 可以登录获取 token。
-- 带 token 可以访问受保护接口。
-- 无 token 访问受保护接口会被拒绝。
-- Swagger 可以查看接口。
-
-## 第 5 步：React 前端基础能力
-
-目标：
-
-- 建立后台管理台基本壳子。
-- 接入登录、路由、请求封装和布局。
-
-主要任务：
-
-- 配置 React Router。
-- 配置 Ant Design。
-- 配置 Axios。
-- 配置 TanStack Query。
-- 实现登录页。
-- 实现后台主布局。
-- 实现侧边栏菜单。
-- 实现登录态保存和退出。
-- 实现接口错误统一提示。
-
-验收标准：
-
-- 可以打开前端页面。
-- 可以登录进入后台。
-- 未登录访问后台会跳转登录页。
-- 后台布局可正常切换页面。
-
-## 第 6 步：Ledger 账务闭环
-
-目标：
-
-- 实现核心账务能力。
-- 支持用户余额查询和账务流水写入。
-
-主要任务：
-
-- 创建 Ledger 表 migration。
-- 实现账务账户创建。
-- 实现 journal 创建。
-- 实现 entries 双分录写入。
-- 实现余额查询。
-- 实现幂等键校验。
-- 实现模拟入账接口。
-
-最小闭环：
-
-```text
-创建用户
-  -> 创建 Ledger 账户
-  -> 调用模拟充值入账
-  -> 查询用户余额
+BROADCASTED
+  -> eth_getTransactionReceipt
+      -> null: 保持 BROADCASTED
+      -> status=0x0: FAILED
+      -> status=0x1:
+           currentBlock - receipt.blockNumber + 1 >= confirmBlocks
+             -> CONFIRMED
+           否则保持 BROADCASTED
 ```
 
 验收标准：
 
-- 用户余额来自 Ledger 汇总或快照。
-- 重复请求不会重复入账。
-- 可以查询账务流水。
+- receipt 不存在时不能提现确认。
+- receipt status 失败时不能进入 CONFIRMED。
+- 确认数不足时保持 BROADCASTED。
+- 达到链配置 `confirmBlocks` 后才能调用 Java 确认接口。
+- RPC 暂时异常不能错误改变提现状态。
+- 有单元测试覆盖上述状态。
 
-## 第 7 步：地址生成闭环
+## P0-2 链上失败自动退款
 
-目标：
+目标：Scanner 检测 receipt `status=0x0` 后通知 Java API 将提现变为 FAILED。
 
-- 实现用户充值地址生成能力。
-- Java API 调 Go Signer 生成地址。
-
-主要任务：
-
-- Go Signer 实现 EVM 地址派生。
-- Go Signer 实现 Solana 地址派生。
-- Java API 实现地址创建接口。
-- Java API 保存地址到 `wallets`。
-- React 前端展示用户地址。
-
-验收标准：
-
-- 可以为用户生成 EVM 地址。
-- 可以为用户生成 Solana 地址。
-- 同一用户同一链不会重复生成多个默认地址，除非业务允许。
-
-## 第 8 步：充值闭环
-
-目标：
-
-- 实现从链上扫描到用户入账的完整充值链路。
-
-主要任务：
-
-- Go Scanner 读取链配置。
-- Go Scanner 扫描 EVM 区块。
-- Go Scanner 解析 ERC20 Transfer。
-- Go Scanner 扫描 Solana finalized 交易。
-- Scanner 上报充值事件到 Java API。
-- Java API 创建充值记录。
-- Java API 达到确认数后写 Ledger 入账。
-- React 前端展示充值记录。
-
-第一阶段可先做模拟上报：
+账务规则：
 
 ```text
-Scanner mock event
-  -> Java internal deposit API
-  -> deposits
-  -> ledger
-  -> balance
+frozen balance DEBIT
+available balance CREDIT
 ```
 
-正式环境约束：
+要求：
 
-- 前端不提供模拟充值入口。
-- Java 普通业务接口不提供直接充值入账能力。
-- 开发期 mock 入账接口只允许 `dev/test` profile。
-- 充值入账唯一可信路径是 Scanner 上报链上事件。
+- 使用稳定幂等键，例如 `withdrawal:fail:<id>`。
+- 重复扫描同一失败交易不会重复退款。
+- 状态更新与 Ledger journal 保持事务一致。
+- 保留失败原因和 tx hash 供运营审计。
 
-验收标准：
+## P0-3 Nonce / Gas / 广播可靠性
 
-- 同一 tx hash + event index 不会重复入账。
-- 充值状态可以从 detected 到 confirmed。
-- 用户余额正确增加。
+- 并发提现必须避免 nonce 冲突。
+- 广播前估算 gas。
+- RPC 失败需要区分可重试和不可重试错误。
+- 保存广播结果和错误原因。
+- stuck transaction 后续支持 replacement transaction。
 
-## 第 9 步：提现闭环
+## P0-4 Signer 安全
 
-目标：
-
-- 实现提现申请、风控、冻结、审核、签名、广播、确认和退款。
-
-主要任务：
-
-- Java API 实现提现申请。
-- 实现提现状态机。
-- 实现余额冻结。
-- 实现基础风控规则。
-- 实现人工审核接口。
-- Go Signer 实现签名接口。
-- Worker 或 Scanner 实现广播结果上报。
-- Java API 处理提现确认。
-- Java API 处理失败退款。
-- React 前端实现提现记录和审核页面。
-
-当前已完成第一阶段：
+Signer 目标结构：
 
 ```text
-用户申请提现
-  -> Java API 校验 Token、链和余额
-  -> 创建 withdrawals
-  -> ledger 可用余额 DEBIT
-  -> ledger 冻结余额 CREDIT
-  -> 前端展示提现记录
+Java API
+  -> Signer API
+  -> Transaction Builder
+  -> Nonce Manager
+  -> Key Provider
+  -> Sign
+  -> Broadcaster
+  -> RPC
 ```
 
-提现状态暂时停留在 `PENDING_APPROVAL`，下一阶段再接人工审核、签名和广播。
+生产环境不应通过命令行参数直接暴露热钱包私钥。Key Provider 应允许后续接入 KMS / Vault / HSM，并保证私钥不出现在日志、API 响应和错误信息中。
 
-验收标准：
+## P0-5 自动测试
 
-- 余额不足不能提现。
-- 提现申请会冻结余额。
-- 审核拒绝会退回冻结余额。
-- 审核通过后可以进入签名流程。
-- 链上成功后最终扣账。
-- 链上失败后退款。
+优先测试资金不变量，而不是页面覆盖率。
 
-## 第 10 步：管理后台完善
+必须覆盖：
 
-目标：
+- 重复充值事件只入账一次。
+- 提现申请只冻结一次。
+- 审核拒绝只退款一次。
+- receipt 不存在不确认。
+- receipt 成功但确认数不足不确认。
+- receipt 成功且确认数达到要求后确认。
+- receipt 失败后只退款一次。
+- Scanner/API 重试不会产生重复 Ledger journal。
 
-- 补齐运营后台常用功能。
+测试层级：
 
-主要任务：
-
-- 用户列表。
-- 用户资产详情。
-- 充值记录筛选。
-- 提现记录筛选。
-- 提现审核。
-- 链配置。
-- Token 配置。
-- 热钱包管理。
-- 系统健康。
-- 审计日志。
-
-验收标准：
-
-- 后台可以完成日常钱包运营动作。
-- 审核和配置类操作都有审计日志。
-- 列表支持分页、筛选和状态展示。
-
-## 第 11 步：Docker Compose 一键启动
-
-目标：
-
-- 提供本地完整运行环境。
-
-主要任务：
-
-- 编写 `infra/docker-compose.yml`。
-- 配置 PostgreSQL。
-- 配置 Redis。
-- 配置 Java API。
-- 配置 Go Scanner。
-- 配置 Go Signer。
-- 配置前端。
-- 配置 Nginx。
-- 提供 `.env.example`。
-
-验收标准：
-
-```text
-docker compose up
-```
-
-后可以启动：
-
-- 前端管理台。
-- Java API。
-- PostgreSQL。
-- Redis。
-- Scanner。
-- Signer。
-
-## 第 12 步：测试与验收
-
-目标：
-
-- 确保核心资金链路可靠。
-
-主要任务：
-
-- Java 单元测试。
-- Java 集成测试。
+- Java service 单元测试。
+- Java repository / API 集成测试。
 - Go Scanner 单元测试。
 - Go Signer 单元测试。
-- 前端关键页面测试。
-- 充值闭环测试。
-- 提现闭环测试。
-- 幂等测试。
-- 失败退款测试。
+- EVM Anvil 端到端资金链路测试。
 
-验收场景：
+## P0-6 CI
+
+GitHub Actions 至少执行：
 
 ```text
-管理员登录
-创建用户
-生成地址
-模拟充值
-确认入账
-查询余额
-发起提现
-审核提现
-签名广播
-确认扣账
-查询最终余额
+backend/api: mvn test
+services/scanner: go test ./...
+services/signer: go test ./...
+apps/web: install + typecheck/build
 ```
 
-## 执行建议
+任何核心测试失败不得合并资金逻辑变更。
 
-建议先完成文档层：
+## P1-7 EVM 自动归集 Sweep
+
+目标：充值完成后把用户充值地址中的资产安全归集到平台热钱包。
 
 ```text
-docs/database-design.md
-docs/api-design.md
+confirmed deposit
+  -> sweep task
+  -> signer
+  -> broadcast
+  -> scanner confirmation
+  -> hot wallet
 ```
 
-然后再进入代码层：
+需要支持：
+
+- Native Token Sweep。
+- ERC20 Sweep。
+- ERC20 地址 gas 补充。
+- sweep 状态机、幂等、重试、nonce 和审计。
+
+## P1-8 完整资产对账
+
+目标关系：
 
 ```text
-apps/web
-backend/api
-services/scanner
-services/signer
-infra/docker-compose.yml
+用户 Ledger liability
+≈ 用户充值地址待归集余额
++ 热钱包余额
++ 冷钱包余额
++ 其他平台受控地址余额
 ```
 
-开发时始终以闭环为单位，不以单个页面或单个接口为单位。优先保证资金流转正确，再逐步提高页面完整度和链服务能力。
+增加：
+
+- reconciliation snapshot。
+- mismatch history。
+- RPC_ERROR / UNKNOWN 等独立状态。
+- 人工处理、原因和 resolved 状态。
+- 告警阈值。
+
+## P1-9 冷热钱包
+
+- 热钱包最低/最高余额阈值。
+- 热钱包不足提醒与补充流程。
+- 超过阈值自动/人工转冷钱包。
+- 冷钱包操作必须使用更严格权限和审批。
+
+## P1-10~12 Solana
+
+Solana 当前不作为 EVM 资金闭环的阻塞项。EVM P0 完成后再进入：
+
+- 地址派生。
+- SOL finalized 充值扫描。
+- SPL Token Transfer 解析。
+- SOL/SPL 提现签名、广播和确认。
+- SOL/SPL 自动归集。
+
+## P2 风控、监控与灾难恢复
+
+风控：
+
+- 单笔/日累计额度。
+- 新地址冷静期。
+- 地址黑白名单。
+- 提现频率与异常行为。
+- 大额双人审核。
+
+监控：
+
+- Scanner block lag。
+- RPC error rate。
+- Signer availability。
+- hot wallet balance。
+- pending/stuck withdrawal。
+- sweep backlog。
+- reconciliation mismatch。
+
+灾难恢复：
+
+- PostgreSQL 定期备份和恢复演练。
+- 钱包密钥备份策略。
+- Scanner cursor 恢复。
+- Ledger 重建与一致性校验。
+
+## 开发验收原则
+
+每个资金功能合并前必须回答：
+
+1. 正常路径是否闭环？
+2. 重试是否幂等？
+3. RPC/数据库/服务失败时是否会错误改变余额？
+4. 是否存在重复入账、重复退款或重复扣账可能？
+5. 是否有自动测试证明上述行为？
+6. 是否有审计信息可以定位资金状态变化？
+
+开发顺序始终以资金安全和可验证性优先，不以页面数量作为完成度标准。
