@@ -8,6 +8,7 @@ import com.cexwallet.api.scanner.ScannerDtos.ScannerConfigResponse;
 import com.cexwallet.api.scanner.ScannerDtos.ScannerCursorView;
 import com.cexwallet.api.scanner.ScannerDtos.BroadcastedWithdrawalView;
 import com.cexwallet.api.scanner.ScannerDtos.ConfirmWithdrawalRequest;
+import com.cexwallet.api.scanner.ScannerDtos.FailWithdrawalRequest;
 import com.cexwallet.api.scanner.ScannerDtos.UpdateCursorRequest;
 import com.cexwallet.api.withdrawal.WithdrawalDtos.WithdrawalView;
 import com.cexwallet.api.withdrawal.WithdrawalService;
@@ -92,6 +93,18 @@ public class InternalScannerController {
     ) {
         assertInternalToken(token);
         return ApiResponse.ok(withdrawalService.confirm(request.withdrawalId(), request.txHash()));
+    }
+
+    @PostMapping("/withdrawals/failed")
+    public ApiResponse<WithdrawalView> failWithdrawal(
+            @RequestHeader(value = "X-Internal-Token", required = false) String token,
+            @Valid @RequestBody FailWithdrawalRequest request
+    ) {
+        assertInternalToken(token);
+        return ApiResponse.ok(withdrawalService.fail(
+                request.withdrawalId(),
+                request.reason() + " (tx=" + request.txHash() + ")"
+        ));
     }
 
     private void assertInternalToken(String token) {
